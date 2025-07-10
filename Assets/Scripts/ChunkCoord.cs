@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
+using UnityEngine;
 
 namespace DefaultNamespace
 {
@@ -16,6 +17,11 @@ namespace DefaultNamespace
             this.x = x;
             this.y = y;
             this.z = z;
+        }
+
+        public void DebugLogCoord()
+        {
+            Debug.Log($"Chunk coord: X:{x}, Y:{y}, Z:{z}");
         }
     }
 }
