@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Jobs;
@@ -39,18 +38,17 @@ public struct ChunkMeshJob : IJob
                             normals.Add(VoxelData.Normals[faceIndex]);
                             uvs.Add(VoxelData.Uvs[j]);
                         }
+                        
+                        // Add 2 triangles for the face using an anti-clockwise direction.
+                        triangles.Add(vertexIndex);
+                        triangles.Add(vertexIndex + 3);
+                        triangles.Add(vertexIndex + 2);
+                        triangles.Add(vertexIndex);
+                        triangles.Add(vertexIndex + 2);
+                        triangles.Add(vertexIndex + 1);   
+                        
+                        vertexIndex += 4;
                     }
-                    
-                    // Add 2 triangles for the face using an anti-clockwise direction.
-                    triangles.Add(vertexIndex);
-                    triangles.Add(vertexIndex + 3);
-                    triangles.Add(vertexIndex + 2);
-                    
-                    triangles.Add(vertexIndex);
-                    triangles.Add(vertexIndex + 2);
-                    triangles.Add(vertexIndex + 1);
-
-                    vertexIndex += 4;
                 }
             }
         }

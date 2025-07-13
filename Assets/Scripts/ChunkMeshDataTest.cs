@@ -14,17 +14,8 @@ public class ChunkMeshDataTest : MonoBehaviour
     
     private void Start()
     {
-        // chunkMeshDataArray = Mesh.AllocateWritableMeshData(chunkSizeX *  chunkSizeZ * chunkSizeY);
         var chunkMeshDataArray = Mesh.AllocateWritableMeshData(1);
         var chunkMeshData = chunkMeshDataArray[0];
-
-        // var generateChunkMeshJob = new GenerateChunkMeshJob()
-        // {
-        //     chunkMeshDataArray = chunkMeshDataArray,
-        //     chunkSizeX = chunkSizeX,
-        //     chunkSizeZ = chunkSizeZ,
-        //     chunkSizeY = chunkSizeY,
-        // };
 
         var generateChunkMeshJob = new ChunkMeshJob()
         {
@@ -40,7 +31,7 @@ public class ChunkMeshDataTest : MonoBehaviour
 
         var chunkMesh = new Mesh {name = "Chunk Mesh Job Test" };
         Mesh.ApplyAndDisposeWritableMeshData(chunkMeshDataArray, chunkMesh);
-        chunkMesh.RecalculateBounds();
+        chunkMesh.RecalculateBounds(MeshUpdateFlags.DontValidateIndices);
         
         var chunkGameObject = new GameObject("Chunk");
         chunkGameObject.transform.SetParent(this.gameObject.transform);
@@ -52,69 +43,7 @@ public class ChunkMeshDataTest : MonoBehaviour
         meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
         meshRenderer.material = new Material(Shader.Find("Standard"));
         
-        var meshCollider = chunkGameObject.AddComponent<MeshCollider>();
-        meshCollider.sharedMesh = chunkMesh;
-        
-        
-        // var meshes = new List<Mesh>(chunkSizeX * chunkSizeZ * chunkSizeY);
-        // for (byte x = 0; x < chunkSizeX; x++)
-        // {
-        //     for (byte z = 0; z < chunkSizeZ; z++)
-        //     {
-        //         for (byte y = 0; y < chunkSizeY; y++)
-        //         {
-        //             meshes.Add(new Mesh { name = $"Mesh Coord: {x} {y} {z}" });
-        //         }
-        //     }
-        // }
-        
-        // Mesh.ApplyAndDisposeWritableMeshData(chunkMeshDataArray, meshes);
-        // meshes.ForEach(x =>
-        // {
-        //     x.RecalculateBounds();
-        //     x.RecalculateNormals();
-        // });
-
-        // var posIterator = 0;
-        // var shaderDefault = Shader.Find("Standard");
-        // foreach (var mesh in meshes)
-        // {
-        //     var gameObject = new GameObject($"{mesh.name}");
-        //     gameObject.transform.SetParent(this.gameObject.transform);
-        //     
-        //     var meshFilter = gameObject.AddComponent<MeshFilter>();
-        //     meshFilter.mesh = mesh;
-        //     
-        //     var meshRenderer = gameObject.AddComponent<MeshRenderer>();
-        //     meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
-        //     meshRenderer.material = new Material(shaderDefault);
-        //
-        //     posIterator++;
-        // }
+        // var meshCollider = chunkGameObject.AddComponent<MeshCollider>();
+        // meshCollider.sharedMesh = chunkMesh;
     }
-
-    // private struct GenerateChunkMeshJob : IJob
-    // {
-    //     public Mesh.MeshDataArray chunkMeshDataArray;
-    //     public byte chunkSizeX;
-    //     public byte chunkSizeZ;
-    //     public byte chunkSizeY;
-    //     
-    //     public void Execute()
-    //     {
-    //         var iterator = 0;
-    //         for (byte x = 0; x < chunkSizeX; x++)
-    //         {
-    //             for (byte z = 0; z < chunkSizeZ; z++)
-    //             {
-    //                 for (byte y = 0; y < chunkSizeY; y++)
-    //                 {
-    //                     var meshData = chunkMeshDataArray[iterator];
-    //                     VoxelData.SetVoxelMeshData(new Vector3(x, y, z), ref meshData);
-    //                     iterator++;
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
 }

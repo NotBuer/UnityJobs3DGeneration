@@ -242,7 +242,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chunkSizeX: 16
   chunkSizeZ: 16
-  chunkSizeY: 255
+  chunkSizeY: 16
+  chunksToGenerate: 1
 --- !u!4 &443833387
 Transform:
   m_ObjectHideFlags: 0
