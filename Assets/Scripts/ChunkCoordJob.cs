@@ -1,23 +1,24 @@
-using DefaultNamespace;
 using Unity.Collections;
 using Unity.Jobs;
 
 public struct ChunkCoordJob : IJob
 {
-    public byte genXAround;
-    public byte genZAround;
-    
+    public byte chunksToGenerate;
+    public byte chunkSize;
     public NativeArray<ChunkCoord> chunkCoords;
     
     public void Execute()
     {
-        byte iteration = 0;
-        for (var currentX = -genXAround; currentX <= genXAround; currentX++)
+        var index = 0;
+        for (var x = -chunksToGenerate; x <= chunksToGenerate; x++)
         {
-            for (var currentZ = -genZAround; currentZ <= genZAround; currentZ++)
+            if (x == 0) continue;
+            
+            for (var z = -chunksToGenerate; z <= chunksToGenerate; z++)
             {
-                chunkCoords[iteration] = new ChunkCoord((short)currentX, 0, (short)currentZ);
-                iteration++;
+                if (z == 0) continue;
+
+                chunkCoords[index++] = new ChunkCoord(x * chunkSize, z * chunkSize);
             }
         }
     }

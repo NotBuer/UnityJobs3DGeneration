@@ -1,82 +1,49 @@
-using DefaultNamespace;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 
 public class WorldManager : MonoBehaviour
 {
-    private const byte ChunkSizeX = 16;
-    private const byte ChunkSizeZ = 16;
-    private const byte ChunkSizeY = 255;
-    
-    [SerializeField] private byte genXAround;
-    [SerializeField] private byte genZAround;
-    [SerializeField] private bool lockChunkGeneration;
-    
-    // private ChunkDataJob chunkDataJob = null;
-    private JobHandle chunkDataJobHandle = default;
-    
-    // private ChunkCoordJob chunkCoordJob = null;
-    private JobHandle chunkCoordJobHandle = default;
+    private const byte RenderDistanceAxisCount = 2;
 
-    private NativeArray<ChunkCoord> ChunkCoordsArray;
-    private NativeArray<Vector3> ChunkVerticesArray;
-    private NativeArray<Vector3> ChunkTrianglesArray;
+    [Range(1, 16)] [SerializeField] private byte chunkSize = 16;
+    [Range(1, 255)] [SerializeField] private byte chunkSizeY = 255;
+    [Range(1, 32)] [SerializeField] private byte chunksToGenerate = 1;
 
+    private NativeArray<ChunkCoord> chunkCoordsArray;
+    private JobHandle genChunkCoordsJobHandle;
+    
+    private JobHandle generateChunkMeshJobHandle;
+    
     private void Awake()
-    {        
-        var chunksToGen = ((genXAround * 2) + 1) * ((genZAround * 2) + 1);
-        ChunkCoordsArray = new NativeArray<ChunkCoord>(chunksToGen, Allocator.Persistent);
-        ChunkVerticesArray = new NativeArray<Vector3>(384, Allocator.Persistent);
-        ChunkTrianglesArray = new NativeArray<Vector3>(192, Allocator.Persistent);
+    {
+        var renderDistancePerAxis = 
+            chunksToGenerate * RenderDistanceAxisCount * RenderDistanceAxisCount;
+        chunkCoordsArray = new NativeArray<ChunkCoord>(renderDistancePerAxis, Allocator.Persistent);
     }
 
     private void Start()
     {
-        var chunkDataJob = new ChunkDataJob()
+        var genChunkCoordJob = new ChunkCoordJob()
         {
-            vertices = ChunkVerticesArray,
-            triangles = ChunkTrianglesArray
-        };
-        
-        var chunkCoordJob = new ChunkCoordJob()
-        {
-            genXAround = genXAround,
-            genZAround = genZAround,
-            chunkCoords = ChunkCoordsArray,
+            chunksToGenerate = chunksToGenerate,
+            chunkSize = chunkSize,
+            chunkCoords = chunkCoordsArray,
         };
 
-        chunkDataJobHandle = chunkDataJob.Schedule();
-        chunkCoordJobHandle = chunkCoordJob.Schedule(chunkDataJobHandle);
-    }
+        genChunkCoordsJobHandle = genChunkCoordJob.Schedule();
 
-    private void LateUpdate()
-    {
-        LateCheckAndLockChunkGeneration();
-    }
+        genChunkCoordsJobHandle.Complete();
 
-    private void LateCheckAndLockChunkGeneration()
-    {
-        chunkDataJobHandle.Complete();
-        chunkCoordJobHandle.Complete();
-        
-        if (lockChunkGeneration) return;
-
-        if (!chunkCoordJobHandle.IsCompleted || !chunkDataJobHandle.IsCompleted) return;
-        
-        foreach (var chunkCoord in ChunkCoordsArray)
+        foreach (var chunkCoord in chunkCoordsArray)
         {
-            chunkCoord.DebugLogCoord();
+            Debug.Log($"{chunkCoord.x}, {chunkCoord.z}");
         }
-        
-        lockChunkGeneration = true;
     }
 
     private void OnApplicationQuit()
     {
-        ChunkCoordsArray.Dispose();
-        ChunkVerticesArray.Dispose();
-        ChunkTrianglesArray.Dispose();
-        Debug.Log("All native arrays cleared!");
+        chunkCoordsArray.Dispose();
+        Debug.Log("All native arrays disposed");
     }
 }
