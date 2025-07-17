@@ -4,8 +4,7 @@ using UnityEngine.Rendering;
 
 public class ChunkMeshDataTest : MonoBehaviour
 {
-    [SerializeField] private byte chunkSizeX = 16;
-    [SerializeField] private byte chunkSizeZ = 16;
+    [SerializeField] private byte chunkSize = 16;
     [SerializeField] private byte chunkSizeY = 255;
     [SerializeField] private byte chunksToGenerate = 1;
 
@@ -14,17 +13,15 @@ public class ChunkMeshDataTest : MonoBehaviour
     private void Start()
     {
         var chunkMeshDataArray = Mesh.AllocateWritableMeshData(1);
-        var chunkMeshData = chunkMeshDataArray[0];
 
-        var generateChunkMeshJob = new ChunkMeshJob()
+        var genChunkMeshJob = new ChunkMeshJob()
         {
-            chunkMeshData = chunkMeshData,
-            chunkSizeX = chunkSizeX,
-            chunkSizeZ = chunkSizeZ,
+            chunkMeshDataArray = chunkMeshDataArray,
+            chunkSize = chunkSize,
             chunkSizeY = chunkSizeY,
         };
 
-        generateChunkMeshJobHandle = generateChunkMeshJob.Schedule();
+        generateChunkMeshJobHandle = genChunkMeshJob.Schedule(chunkMeshDataArray.Length, 2);
 
         generateChunkMeshJobHandle.Complete();
 
@@ -41,8 +38,5 @@ public class ChunkMeshDataTest : MonoBehaviour
         var meshRenderer = chunkGameObject.AddComponent<MeshRenderer>();
         meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
         meshRenderer.material = new Material(Shader.Find("Standard"));
-        
-        // var meshCollider = chunkGameObject.AddComponent<MeshCollider>();
-        // meshCollider.sharedMesh = chunkMesh;
     }
 }

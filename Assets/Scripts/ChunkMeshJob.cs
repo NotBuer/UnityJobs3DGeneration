@@ -4,15 +4,16 @@ using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public struct ChunkMeshJob : IJob
+public struct ChunkMeshJob : IJobParallelFor
 {
-    public Mesh.MeshData chunkMeshData;
-    public byte chunkSizeX;
-    public byte chunkSizeZ;
+    public Mesh.MeshDataArray chunkMeshDataArray;
+    public byte chunkSize;
     public byte chunkSizeY;
     
-    public void Execute()
+    public void Execute(int index)
     {
+        var chunkMeshData = chunkMeshDataArray[index];
+        
         var vertices = new List<Vector3>();
         var triangles = new List<int>();
         var normals = new List<Vector3>();
@@ -20,9 +21,9 @@ public struct ChunkMeshJob : IJob
 
         var vertexIndex = 0;
         
-        for (byte x = 0; x < chunkSizeX; x++)
+        for (byte x = 0; x < chunkSize; x++)
         {
-            for (byte z = 0; z < chunkSizeZ; z++)
+            for (byte z = 0; z < chunkSize; z++)
             {
                 for (byte y = 0; y < chunkSizeY; y++)
                 {
@@ -47,16 +48,21 @@ public struct ChunkMeshJob : IJob
                         triangles.Add(vertexIndex + 2);
                         triangles.Add(vertexIndex + 1);   
                         
-                        vertexIndex += 4;
+                        vertexIndex += VoxelData.FaceEdges;
                     }
                 }
             }
         }
         
-        var vertexAttributes = new NativeArray<VertexAttributeDescriptor>(3, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-        vertexAttributes[0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3, stream: 0);
-        vertexAttributes[1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, stream: 1);
-        vertexAttributes[2] = new VertexAttributeDescriptor(VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 2, stream: 2);
+        var vertexAttributes = new NativeArray<VertexAttributeDescriptor>
+            (3, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+        
+        vertexAttributes[0] = new VertexAttributeDescriptor
+            (VertexAttribute.Position, VertexAttributeFormat.Float32, 3, stream: 0);
+        vertexAttributes[1] = new VertexAttributeDescriptor
+            (VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, stream: 1);
+        vertexAttributes[2] = new VertexAttributeDescriptor
+            (VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 2, stream: 2);
         
         chunkMeshData.SetVertexBufferParams(vertices.Count, vertexAttributes);
         vertexAttributes.Dispose();
