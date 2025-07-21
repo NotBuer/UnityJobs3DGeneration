@@ -7,12 +7,16 @@ using UnityEngine.Rendering;
 public struct ChunkMeshJob : IJobParallelFor
 {
     public Mesh.MeshDataArray chunkMeshDataArray;
-    public byte chunkSize;
-    public byte chunkSizeY;
+    public int chunkVoxelCount;
+    public NativeArray<ChunkData> chunkDataArray;
+    [ReadOnly] public NativeArray<VoxelData> voxelDataSlice;
     
     public void Execute(int index)
     {
         var chunkMeshData = chunkMeshDataArray[index];
+        var voxelStartIndex = chunkVoxelCount * index;
+        
+        var chunkVoxelData = voxelDataSlice.Slice(voxelStartIndex, chunkVoxelCount);
         
         var vertices = new List<Vector3>();
         var triangles = new List<int>();
@@ -20,37 +24,36 @@ public struct ChunkMeshJob : IJobParallelFor
         var uvs = new List<Vector2>();
 
         var vertexIndex = 0;
-        
-        for (byte x = 0; x < chunkSize; x++)
-        {
-            for (byte z = 0; z < chunkSize; z++)
-            {
-                for (byte y = 0; y < chunkSizeY; y++)
-                {
-                    var voxelPosition = new Vector3(x, y, z);
 
-                    // For each face of the 6 voxel faces.
-                    for (byte faceIndex = 0; faceIndex < VoxelData.FaceCount; faceIndex++)
-                    {
-                        // Add 4 vertices, normals, and UVs for the current face.
-                        for (byte j = 0; j < VoxelData.FaceEdges; j++)
-                        {
-                            vertices.Add(voxelPosition + VoxelData.Vertices[VoxelData.FaceVertices[faceIndex, j]]);
-                            normals.Add(VoxelData.Normals[faceIndex]);
-                            uvs.Add(VoxelData.Uvs[j]);
-                        }
-                        
-                        // Add 2 triangles for the face using an anti-clockwise direction.
-                        triangles.Add(vertexIndex);
-                        triangles.Add(vertexIndex + 3);
-                        triangles.Add(vertexIndex + 2);
-                        triangles.Add(vertexIndex);
-                        triangles.Add(vertexIndex + 2);
-                        triangles.Add(vertexIndex + 1);   
-                        
-                        vertexIndex += VoxelData.FaceEdges;
-                    }
+        for (var voxelIndex = 0; voxelIndex < chunkVoxelData.Length; voxelIndex++)
+        {
+            var voxelPosition = new Vector3(
+                chunkVoxelData[voxelIndex].x + chunkDataArray[index].x,
+                chunkVoxelData[voxelIndex].y, 
+                chunkVoxelData[voxelIndex].z + chunkDataArray[index].z
+            );
+
+            // For each face of the 6 voxel faces.
+            for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
+            {
+                // Add 4 vertices, normals, and UVs for the current face.
+                for (byte j = 0; j < VoxelUtils.FaceEdges; j++)
+                {
+                    vertices.Add(
+                        voxelPosition + VoxelUtils.Vertices[VoxelUtils.FaceVertices[faceIndex, j]]);
+                    normals.Add(VoxelUtils.Normals[faceIndex]);
+                    uvs.Add(VoxelUtils.Uvs[j]);
                 }
+
+                // Add 2 triangles for the face using an anti-clockwise direction.
+                triangles.Add(vertexIndex);
+                triangles.Add(vertexIndex + 3);
+                triangles.Add(vertexIndex + 2);
+                triangles.Add(vertexIndex);
+                triangles.Add(vertexIndex + 2);
+                triangles.Add(vertexIndex + 1);
+
+                vertexIndex += VoxelUtils.FaceEdges;
             }
         }
         

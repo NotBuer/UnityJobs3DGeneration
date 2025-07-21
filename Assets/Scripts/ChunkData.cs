@@ -3,25 +3,25 @@ using System.Runtime.InteropServices;
 
 [Serializable]
 [StructLayout(LayoutKind.Sequential)]
-public struct ChunkCoord : IEquatable<ChunkCoord>
+public struct ChunkData : IEquatable<ChunkData>
 {
-    public int x;
-    public int z;
+    public float x;
+    public float z;
 
-    public ChunkCoord(int x, int z)
+    public ChunkData(float x, float z)
     {
         this.x = x;
         this.z = z;
     }
 
-    public bool Equals(ChunkCoord other)
+    public bool Equals(ChunkData other)
     {
         return x == other.x && z == other.z;
     }
 
     public override bool Equals(object obj)
     {
-        return obj is ChunkCoord other && Equals(other);
+        return obj is ChunkData other && Equals(other);
     }
 
     public override int GetHashCode()
