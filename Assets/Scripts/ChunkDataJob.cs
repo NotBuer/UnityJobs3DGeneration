@@ -1,6 +1,8 @@
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 
+[BurstCompile]
 public struct ChunkDataJob : IJob
 {
     public byte chunksToGenerate;
@@ -13,14 +15,11 @@ public struct ChunkDataJob : IJob
     {
         var chunkIndex = 0;
         var voxelIndex = 0;
+        
         for (var chunkX = -chunksToGenerate; chunkX < chunksToGenerate; chunkX++)
         {
-            // if (chunkX == 0) continue;
-            
             for (var chunkZ = -chunksToGenerate; chunkZ < chunksToGenerate; chunkZ++)
             {
-                // if (chunkZ == 0) continue;
-
                 var currentChunkX = chunkX * chunkSize;
                 var currentChunkZ = chunkZ * chunkSize;
 
@@ -43,51 +42,7 @@ public struct ChunkDataJob : IJob
                         }
                     }
                 }
-
-                // var startX = 0;
-                // var startZ = 0;
-                // var endX = 0;
-                // var endZ = 0;
-                //
-                // switch (currentChunkX)
-                // {
-                //     case < 0:
-                //         startX = currentChunkX;
-                //         endX = currentChunkX + chunkSize;
-                //         break;
-                //     case > 0:
-                //         startX = currentChunkX - chunkSize;
-                //         endX = currentChunkX;
-                //         break;
-                // }
-                //
-                // switch (currentChunkZ)
-                // {
-                //     case < 0:
-                //         startZ = currentChunkZ;
-                //         endZ = currentChunkZ + chunkSize;
-                //         break;
-                //     case > 0:
-                //         startZ = currentChunkZ - chunkSize;
-                //         endZ = currentChunkZ;
-                //         break;
-                // }
-                //
-                // for (var voxelX = startX; voxelX < endX; voxelX++)
-                // {
-                //     for (var voxelZ = startZ; voxelZ < endZ; voxelZ++)
-                //     {
-                //         for (var voxelY = 0; voxelY < chunkSizeY; voxelY++)
-                //         {
-                //             voxelDataArray[voxelIndex++] = new VoxelData(
-                //                 voxelX, 
-                //                 voxelY, 
-                //                 voxelZ
-                //             );
-                //         }
-                //     }
-                // }
-
+                
                 chunkIndex++;
             }
         }

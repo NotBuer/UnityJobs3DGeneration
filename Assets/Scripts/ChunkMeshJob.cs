@@ -1,9 +1,10 @@
-using System.Collections.Generic;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
 
+[BurstCompile]
 public struct ChunkMeshJob : IJobParallelFor
 {
     public Mesh.MeshDataArray chunkMeshDataArray;
@@ -18,10 +19,11 @@ public struct ChunkMeshJob : IJobParallelFor
         
         var chunkVoxelData = voxelDataSlice.Slice(voxelStartIndex, chunkVoxelCount);
         
-        var vertices = new List<Vector3>();
-        var triangles = new List<int>();
-        var normals = new List<Vector3>();
-        var uvs = new List<Vector2>();
+        // TODO: Find out which is the best values to pre-allocate each nativelist.
+        var vertices = new NativeList<Vector3>(0, Allocator.Temp);
+        var triangles = new NativeList<int>(0, Allocator.Temp);
+        var normals = new NativeList<Vector3>(0, Allocator.Temp);
+        var uvs = new NativeList<Vector2>(0, Allocator.Temp);
 
         var vertexIndex = 0;
 
@@ -40,7 +42,7 @@ public struct ChunkMeshJob : IJobParallelFor
                 for (byte j = 0; j < VoxelUtils.FaceEdges; j++)
                 {
                     vertices.Add(
-                        voxelPosition + VoxelUtils.Vertices[VoxelUtils.FaceVertices[faceIndex, j]]);
+                        voxelPosition + VoxelUtils.Vertices[VoxelUtils.FaceVertices[faceIndex * VoxelUtils.FaceEdges + j]]);
                     normals.Add(VoxelUtils.Normals[faceIndex]);
                     uvs.Add(VoxelUtils.Uvs[j]);
                 }
@@ -67,24 +69,29 @@ public struct ChunkMeshJob : IJobParallelFor
         vertexAttributes[2] = new VertexAttributeDescriptor
             (VertexAttribute.TexCoord0, VertexAttributeFormat.Float32, dimension: 2, stream: 2);
         
-        chunkMeshData.SetVertexBufferParams(vertices.Count, vertexAttributes);
+        chunkMeshData.SetVertexBufferParams(vertices.Length, vertexAttributes);
         vertexAttributes.Dispose();
         
-        chunkMeshData.SetIndexBufferParams(triangles.Count, IndexFormat.UInt32);
+        chunkMeshData.SetIndexBufferParams(triangles.Length, IndexFormat.UInt32);
         
         var meshVertices = chunkMeshData.GetVertexData<Vector3>(0);
-        meshVertices.CopyFrom(vertices.ToArray());
+        meshVertices.CopyFrom(vertices.AsArray());
         
         var meshNormals = chunkMeshData.GetVertexData<Vector3>(1);
-        meshNormals.CopyFrom(normals.ToArray());
+        meshNormals.CopyFrom(normals.AsArray());
         
         var meshUvs = chunkMeshData.GetVertexData<Vector2>(2);
-        meshUvs.CopyFrom(uvs.ToArray());
+        meshUvs.CopyFrom(uvs.AsArray());
         
         var meshTriangles = chunkMeshData.GetIndexData<int>();
-        meshTriangles.CopyFrom(triangles.ToArray());
+        meshTriangles.CopyFrom(triangles.AsArray());
         
         chunkMeshData.subMeshCount = 1;
-        chunkMeshData.SetSubMesh(0, new SubMeshDescriptor(0, triangles.Count), MeshUpdateFlags.DontRecalculateBounds);
+        chunkMeshData.SetSubMesh(0, new SubMeshDescriptor(0, triangles.Length), MeshUpdateFlags.DontRecalculateBounds);
+
+        vertices.Dispose();
+        triangles.Dispose();
+        normals.Dispose();
+        uvs.Dispose();
     }
 }

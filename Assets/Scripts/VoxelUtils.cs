@@ -27,14 +27,14 @@ public static class VoxelUtils
         Vector3.up // Top Face
     };
 
-    public static readonly int[,] FaceVertices = new int[6, 4]
+    public static readonly byte[] FaceVertices = new byte[6 * 4]
     {
-        { 0, 4, 5, 1 }, // Back Face (Z+)
-        { 2, 6, 7, 3 }, // Front Face (Z-)
-        { 3, 7, 4, 0 }, // Left Face (X-)
-        { 1, 5, 6, 2 }, // Right Face (X+)
-        { 3, 0, 1, 2 }, // Bottom Face (Y-)
-        { 4, 7, 6, 5 }  // Top Face (Y+)
+        0, 4, 5, 1, // Back Face (Z+)
+        2, 6, 7, 3, // Front Face (Z-)
+        3, 7, 4, 0, // Left Face (X-)
+        1, 5, 6, 2, // Right Face (X+)
+        3, 0, 1, 2, // Bottom Face (Y-)
+        4, 7, 6, 5  // Top Face (Y+)   
     };
 
     public static readonly Vector2[] Uvs = new Vector2[4]

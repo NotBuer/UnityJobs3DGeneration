@@ -22,8 +22,8 @@ public class WorldManager : MonoBehaviour
     
     private void Awake()
     {
-        var renderDistancePerAxis = 
-            chunksToGenerate * RenderDistanceAxisCount * RenderDistanceAxisCount;
+        var renderDistancePerAxis =
+            chunksToGenerate * RenderDistanceAxisCount * chunksToGenerate * RenderDistanceAxisCount;
         
         chunkDataArray = new NativeArray<ChunkData>(
             renderDistancePerAxis, Allocator.Persistent);
