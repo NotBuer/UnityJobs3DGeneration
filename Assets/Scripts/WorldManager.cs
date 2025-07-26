@@ -13,6 +13,8 @@ public class WorldManager : MonoBehaviour
     [Range(1, 16)] [SerializeField] private byte chunkSize = 16;
     [Range(1, 255)] [SerializeField] private byte chunkSizeY = 255;
     [Range(1, 32)] [SerializeField] private byte chunksToGenerate = 1;
+	[SerializeField] private float frequency;
+    [SerializeField] private float amplitude;
 
     private NativeArray<ChunkData> chunkDataArray;
     private NativeArray<VoxelData> voxelDataArray;
@@ -33,30 +35,21 @@ public class WorldManager : MonoBehaviour
 
     private void Start()
     {
-        var chunkDataJob = new ChunkDataJob()
-        {
-            chunksToGenerate = chunksToGenerate,
-            chunkSize = chunkSize,
-            chunkSizeY = chunkSizeY,
-            chunkDataArray = chunkDataArray,
-            voxelDataArray = voxelDataArray,
-        };
-
-        chunkDataJobHandle = chunkDataJob.Schedule();
+        var chunkDataJob = new ChunkDataJob(
+            chunksToGenerate, chunkSize, chunkSizeY, frequency, amplitude, chunkDataArray, voxelDataArray);
+        
+        chunkDataJobHandle = chunkDataJob.Schedule(chunkDataArray.Length, 1);
         chunkDataJobHandle.Complete();
         
         var chunkMeshDataArray = Mesh.AllocateWritableMeshData(chunkDataArray.Length);
 
-        var chunkMeshJob = new ChunkMeshJob()
-        {
-            chunkMeshDataArray = chunkMeshDataArray,
-            chunkVoxelCount = chunkSize * chunkSize * chunkSizeY,
-            chunkDataArray = chunkDataArray,
-            voxelDataSlice = voxelDataArray
-        };
+        var chunkMeshJob = new ChunkMeshJob(
+            chunkMeshDataArray, 
+            chunkSize * chunkSize * chunkSizeY, 
+            chunkSize, chunkSizeY, chunkDataArray, voxelDataArray);
         
         chunkMeshJobHandle = chunkMeshJob.Schedule(
-            chunkMeshDataArray.Length, 2, chunkDataJobHandle);
+            chunkMeshDataArray.Length, 1, chunkDataJobHandle);
         chunkMeshJobHandle.Complete();
         
         var chunkMeshes = new List<Mesh>(chunkMeshDataArray.Length);

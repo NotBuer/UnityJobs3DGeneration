@@ -7,17 +7,35 @@ using UnityEngine.Rendering;
 [BurstCompile]
 public struct ChunkMeshJob : IJobParallelFor
 {
-    public Mesh.MeshDataArray chunkMeshDataArray;
-    public int chunkVoxelCount;
-    public NativeArray<ChunkData> chunkDataArray;
-    [ReadOnly] public NativeArray<VoxelData> voxelDataSlice;
-    
+    private Mesh.MeshDataArray _chunkMeshDataArray;
+    [ReadOnly] private readonly int _chunkVoxelCount;
+    [ReadOnly] private readonly byte _chunkSize;
+    [ReadOnly] private readonly int _chunkSizeY;
+    [ReadOnly] private NativeArray<ChunkData> _chunkDataArray;
+    [ReadOnly] private readonly NativeArray<VoxelData> _voxelDataArray;
+
+    public ChunkMeshJob(
+        Mesh.MeshDataArray chunkMeshDataArray, 
+        int chunkVoxelCount,
+        byte chunkSize,
+        byte chunkSizeY,
+        NativeArray<ChunkData> chunkDataArray, 
+        NativeArray<VoxelData> voxelDataArray)
+    {
+        _chunkMeshDataArray = chunkMeshDataArray;
+        _chunkVoxelCount = chunkVoxelCount;
+        _chunkSize = chunkSize;
+        _chunkSizeY = chunkSizeY;
+        _chunkDataArray = chunkDataArray;
+        _voxelDataArray = voxelDataArray;
+    }
+
     public void Execute(int index)
     {
-        var chunkMeshData = chunkMeshDataArray[index];
-        var voxelStartIndex = chunkVoxelCount * index;
+        var chunkMeshData = _chunkMeshDataArray[index];
+        var voxelStartIndex = _chunkVoxelCount * index;
         
-        var chunkVoxelData = voxelDataSlice.Slice(voxelStartIndex, chunkVoxelCount);
+        var chunkVoxelDataSlice = _voxelDataArray.Slice(voxelStartIndex, _chunkVoxelCount);
         
         // TODO: Find out which is the best values to pre-allocate each nativelist.
         var vertices = new NativeList<Vector3>(0, Allocator.Temp);
@@ -27,17 +45,43 @@ public struct ChunkMeshJob : IJobParallelFor
 
         var vertexIndex = 0;
 
-        for (var voxelIndex = 0; voxelIndex < chunkVoxelData.Length; voxelIndex++)
+        for (var voxelIndex = 0; voxelIndex < chunkVoxelDataSlice.Length; voxelIndex++)
         {
+            var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, _chunkSize, _chunkSizeY);
+
             var voxelPosition = new Vector3(
-                chunkVoxelData[voxelIndex].x + chunkDataArray[index].x,
-                chunkVoxelData[voxelIndex].y, 
-                chunkVoxelData[voxelIndex].z + chunkDataArray[index].z
-            );
+                x + _chunkDataArray[index].x,
+                y,
+                z + _chunkDataArray[index].z);
+            
+            if (chunkVoxelDataSlice[voxelIndex]._type == VoxelType.Air)
+                continue;
 
             // For each face of the 6 voxel faces.
             for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
             {
+                // var normal = VoxelUtils.Normals[faceIndex];
+                //
+                // var neighborLocalX = x + (int)normal.x;
+                // var neighborLocalY = y + (int)normal.y;
+                // var neighborLocalZ = z + (int)normal.z;
+                //
+                // var neighborVoxelType = VoxelType.Air;
+                //
+                // // Check if the neighbor voxel is within the chunk bounds.
+                // if (neighborLocalX >= 0 && neighborLocalX < _chunkSize &&
+                //     neighborLocalY >= 0 && neighborLocalY < _chunkSizeY &&
+                //     neighborLocalZ >= 0 && neighborLocalZ < _chunkSize)
+                // {
+                //     var neighborVoxelIndex = 
+                //         neighborLocalX * (_chunkSize * _chunkSizeY) + neighborLocalZ * _chunkSizeY + neighborLocalY;
+                //     
+                //     neighborVoxelType = chunkVoxelDataSlice[neighborVoxelIndex]._type;
+                // }
+                //
+                // // If the neighbor voxel is solid, we can skip this face.
+                // if (neighborVoxelType != VoxelType.Air) continue;
+                
                 // Add 4 vertices, normals, and UVs for the current face.
                 for (byte j = 0; j < VoxelUtils.FaceEdges; j++)
                 {
