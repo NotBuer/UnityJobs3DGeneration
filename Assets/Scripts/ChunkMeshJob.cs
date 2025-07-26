@@ -47,47 +47,47 @@ public struct ChunkMeshJob : IJobParallelFor
 
         for (var voxelIndex = 0; voxelIndex < chunkVoxelDataSlice.Length; voxelIndex++)
         {
+            if (chunkVoxelDataSlice[voxelIndex]._type == VoxelType.Air)
+                continue;
+            
             var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, _chunkSize, _chunkSizeY);
 
             var voxelPosition = new Vector3(
                 x + _chunkDataArray[index].x,
                 y,
                 z + _chunkDataArray[index].z);
-            
-            if (chunkVoxelDataSlice[voxelIndex]._type == VoxelType.Air)
-                continue;
 
             // For each face of the 6 voxel faces.
             for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
             {
-                // var normal = VoxelUtils.Normals[faceIndex];
-                //
-                // var neighborLocalX = x + (int)normal.x;
-                // var neighborLocalY = y + (int)normal.y;
-                // var neighborLocalZ = z + (int)normal.z;
-                //
-                // var neighborVoxelType = VoxelType.Air;
-                //
-                // // Check if the neighbor voxel is within the chunk bounds.
-                // if (neighborLocalX >= 0 && neighborLocalX < _chunkSize &&
-                //     neighborLocalY >= 0 && neighborLocalY < _chunkSizeY &&
-                //     neighborLocalZ >= 0 && neighborLocalZ < _chunkSize)
-                // {
-                //     var neighborVoxelIndex = 
-                //         neighborLocalX * (_chunkSize * _chunkSizeY) + neighborLocalZ * _chunkSizeY + neighborLocalY;
-                //     
-                //     neighborVoxelType = chunkVoxelDataSlice[neighborVoxelIndex]._type;
-                // }
-                //
-                // // If the neighbor voxel is solid, we can skip this face.
-                // if (neighborVoxelType != VoxelType.Air) continue;
+                var normal = VoxelUtils.Normals[faceIndex];
+                
+                var neighborLocalX = x + normal.x;
+                var neighborLocalY = y + normal.y;
+                var neighborLocalZ = z + normal.z;
+                
+                var neighborVoxelType = VoxelType.Air;
+                
+                // Check if the neighbor voxel is within the chunk bounds.
+                if (neighborLocalX >= 0 && neighborLocalX < _chunkSize &&
+                    neighborLocalY >= 0 && neighborLocalY < _chunkSizeY &&
+                    neighborLocalZ >= 0 && neighborLocalZ < _chunkSize)
+                {
+                    var neighborVoxelIndex = ChunkUtils.Flatten3DLocalCoordsToIndex(
+                        neighborLocalX, neighborLocalY, neighborLocalZ, _chunkSize, _chunkSizeY);
+                    
+                    neighborVoxelType = chunkVoxelDataSlice[neighborVoxelIndex]._type;
+                }
+
+                // If the neighbor voxel isn't air (it is solid), we can skip this face.
+                if (neighborVoxelType != VoxelType.Air) continue;
                 
                 // Add 4 vertices, normals, and UVs for the current face.
                 for (byte j = 0; j < VoxelUtils.FaceEdges; j++)
                 {
                     vertices.Add(
                         voxelPosition + VoxelUtils.Vertices[VoxelUtils.FaceVertices[faceIndex * VoxelUtils.FaceEdges + j]]);
-                    normals.Add(VoxelUtils.Normals[faceIndex]);
+                    normals.Add(normal);
                     uvs.Add(VoxelUtils.Uvs[j]);
                 }
 

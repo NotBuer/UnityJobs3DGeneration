@@ -59,7 +59,7 @@ public struct ChunkDataJob : IJobParallelFor
                 {
                     var voxelType = VoxelType.Air;
 
-                    if (voxelY < height)
+                    if (voxelY <= height)
                     {
                         voxelType = VoxelType.Grass;
                     }

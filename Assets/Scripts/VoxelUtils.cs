@@ -17,20 +17,22 @@ public static class VoxelUtils
         new(-0.5f,  0.5f, -0.5f)  // Front top-left     
     };
 
-    public static readonly Vector3[] Normals = new Vector3[6]
+    public static readonly Vector3Int[] Normals = new Vector3Int[6]
     {
-        Vector3.back, // Back Face
-        Vector3.forward, // Front Face
-        Vector3.left, // Left Face
-        Vector3.right, // Right Face
-        Vector3.down, // Bottom Face
-        Vector3.up // Top Face
+        new( 0,  0, -1), // Front Face
+        new( 0,  0,  1), // Back Face
+        new(-1,  0,  0), // Left Face
+        new( 1,  0,  0), // Right Face
+        new( 0, -1,  0), // Bottom Face
+        new( 0,  1,  0)  // Top Face
     };
 
     public static readonly byte[] FaceVertices = new byte[6 * 4]
     {
-        0, 4, 5, 1, // Back Face (Z+)
-        2, 6, 7, 3, // Front Face (Z-)
+        // 0, 4, 5, 1, // Back Face (Z+)
+        // 2, 6, 7, 3, // Front Face (Z-)
+        3, 2, 6, 7, // Front Face (Z-)
+        1, 0, 4, 5, // Back Face (Z+)
         3, 7, 4, 0, // Left Face (X-)
         1, 5, 6, 2, // Right Face (X+)
         3, 0, 1, 2, // Bottom Face (Y-)
