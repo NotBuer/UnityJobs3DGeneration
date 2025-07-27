@@ -212,9 +212,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chunkSize: 16
   chunkSizeY: 8
-  chunksToGenerate: 1
-  frequency: 0.1
-  amplitude: 10
+  chunksToGenerate: 2
+  frequency: 0.05
+  amplitude: 12
 --- !u!4 &138600323
 Transform:
   m_ObjectHideFlags: 0
@@ -384,7 +384,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!108 &410087040
 Light:
   m_ObjectHideFlags: 0

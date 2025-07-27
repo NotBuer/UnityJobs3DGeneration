@@ -6,8 +6,6 @@ using UnityEngine.Rendering;
 
 public class WorldManager : MonoBehaviour
 {
-    public const float OriginPointGenerationOffset = 0.5f;
-    
     private const byte RenderDistanceAxisCount = 2;
     
     [Range(1, 16)] [SerializeField] private byte chunkSize = 16;
@@ -46,7 +44,7 @@ public class WorldManager : MonoBehaviour
         var chunkMeshJob = new ChunkMeshJob(
             chunkMeshDataArray, 
             chunkSize * chunkSize * chunkSizeY, 
-            chunkSize, chunkSizeY, chunkDataArray, voxelDataArray);
+            chunkSize, chunkSizeY, chunksToGenerate, chunkDataArray, voxelDataArray);
         
         chunkMeshJobHandle = chunkMeshJob.Schedule(
             chunkMeshDataArray.Length, 1, chunkDataJobHandle);

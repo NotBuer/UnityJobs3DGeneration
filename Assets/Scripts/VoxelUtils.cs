@@ -29,8 +29,6 @@ public static class VoxelUtils
 
     public static readonly byte[] FaceVertices = new byte[6 * 4]
     {
-        // 0, 4, 5, 1, // Back Face (Z+)
-        // 2, 6, 7, 3, // Front Face (Z-)
         3, 2, 6, 7, // Front Face (Z-)
         1, 0, 4, 5, // Back Face (Z+)
         3, 7, 4, 0, // Left Face (X-)
