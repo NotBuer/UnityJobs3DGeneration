@@ -61,9 +61,9 @@ namespace Chunk
     
             BuildChunkMeshData(
                 ref vertexIndex, 
-                voxelStartIndex, 
-                currentChunkWorldX,
-                currentChunkWorldZ,
+                in voxelStartIndex, 
+                in currentChunkWorldX,
+                in currentChunkWorldZ,
                 ref vertices,
                 ref triangles,
                 ref normals,
@@ -77,9 +77,9 @@ namespace Chunk
                 ref triangles,
                 ref normals,
                 ref colors,
-                ref boundsMin,
-                ref boundsMax,
-                index);
+                in boundsMin,
+                in boundsMax,
+                in index);
     
             vertices.Dispose();
             triangles.Dispose();
@@ -89,9 +89,9 @@ namespace Chunk
         
         private void BuildChunkMeshData(
             ref int vertexIndex, 
-            int voxelStartIndex, 
-            float currentChunkWorldX,
-            float currentChunkWorldZ,
+            in int voxelStartIndex, 
+            in float currentChunkWorldX,
+            in float currentChunkWorldZ,
             ref NativeList<Vector3> vertices,
             ref NativeList<int> triangles,
             ref NativeList<Vector3> normals,
@@ -101,8 +101,10 @@ namespace Chunk
         {
             for (var voxelIndex = 0; voxelIndex < _chunkVoxelCount; voxelIndex++)
             {
-                if (_voxelDataArray[voxelStartIndex + voxelIndex]._type == VoxelType.Air)
+                if (_voxelDataArray[voxelStartIndex + voxelIndex].type == VoxelType.Air)
                     continue;
+
+                var voxelType = _voxelDataArray[voxelStartIndex + voxelIndex].type;
                 
                 var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, _chunkSize, _chunkSizeY);
     
@@ -115,74 +117,16 @@ namespace Chunk
                 for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
                 {
                     var normal = VoxelUtils.Normals[faceIndex];
-    
-                    var neighborGlobalX = currentChunkWorldX + x + normal.x;
-                    var neighborGlobalY = y + normal.y;
-                    var neighborGlobalZ = currentChunkWorldZ + z + normal.z;
-    
-                    var neighborVoxelType = VoxelType.Air;
                     
-                    // First, check Y bounds (outside the world vertically is always air).
-                    if (neighborGlobalY < 0 || neighborGlobalY >= _chunkSizeY)
-                    {
-                        neighborVoxelType = VoxelType.Air;
-                    }
-                    else
-                    {
-                        // Determine if the neighbor is within the current chunk's XZ bounds (locally 0 to chunkSize-1).
-                        var isNeighborInSameChunkXZ = 
-                            (x + normal.x >= 0 && x + normal.x < _chunkSize &&
-                             z + normal.z >= 0 && z + normal.z < _chunkSize);
+                    var neighborVoxelType = VoxelType.Air;
     
-                        if (isNeighborInSameChunkXZ)
-                        {
-                            // Neighbor voxel is within the current chunk's local XZ bounds
-                            var neighborLocalX = x + normal.x;
-                            var neighborLocalY = y + normal.y;
-                            var neighborLocalZ = z + normal.z;
-                            
-                            var neighborVoxelLocalIndex = ChunkUtils.Flatten3DLocalCoordsToIndex(
-                                0, neighborLocalX, neighborLocalY, neighborLocalZ, _chunkSize, _chunkSizeY);
-                            
-                            neighborVoxelType = _voxelDataArray[voxelStartIndex + neighborVoxelLocalIndex]._type;
-                        }
-                        else // Neighbor is in an adjacent chunk (or outside the generated area horizontally)
-                        {
-                            // Calculate target chunk grid coordinates.
-                            var targetChunkGridX = Mathf.FloorToInt(neighborGlobalX / _chunkSize);
-                            var targetChunkGridZ = Mathf.FloorToInt(neighborGlobalZ / _chunkSize);
-                            
-                            // Check if the target chunk's grid coordinates are within the generated world bounds. 
-                            if (targetChunkGridX >= -_chunksToGenerate && targetChunkGridX < _chunksToGenerate &&
-                                targetChunkGridZ >= -_chunksToGenerate && targetChunkGridZ < _chunksToGenerate)
-                            {
-                                // Calculate target local voxel coordinates within that chunk.
-                                var targetVoxelLocalX = (int)((neighborGlobalX % _chunkSize + _chunkSize) % _chunkSize);
-                                var targetVoxelLocalY = (int)((neighborGlobalY % _chunkSizeY + _chunkSizeY) % _chunkSizeY);
-                                var targetVoxelLocalZ = (int)((neighborGlobalZ % _chunkSize + _chunkSize) % _chunkSize);
-                            
-                                // Convert chunk grid coordinates to linear index in chunkDataArray
-                                var targetChunkIndex = (targetChunkGridZ + _chunksToGenerate) * 
-                                                       (_chunksToGenerate * 2) + // 2 Axis
-                                                       (targetChunkGridX + _chunksToGenerate);
-                            
-                                // Check if the target chunk is within the valid bounds of generated chunks.
-                                if (targetChunkIndex >= 0 && targetChunkIndex < _chunkDataArray.Length)
-                                {
-                                    var targetVoxelAbsoluteIndex = (targetChunkIndex * _chunkVoxelCount) +
-                                                                   ChunkUtils.Flatten3DLocalCoordsToIndex(
-                                                                       0, targetVoxelLocalX, targetVoxelLocalY, targetVoxelLocalZ,
-                                                                       _chunkSize, _chunkSizeY);
-                                
-                                    // Check if the target voxel absolute index is within bounds of the overall voxelDataArray.
-                                    if (targetVoxelAbsoluteIndex >= 0 && targetVoxelAbsoluteIndex < _voxelDataArray.Length)
-                                    {
-                                        neighborVoxelType = _voxelDataArray[targetVoxelAbsoluteIndex]._type;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    ApplyFaceCulling(
+                        ref neighborVoxelType,
+                        in currentChunkWorldX,
+                        in currentChunkWorldZ,
+                        in x, in y, in z,
+                        in normal,
+                        in voxelStartIndex);
     
                     // If the neighbor voxel isn't air (it is solid), we can skip this face.
                     if (neighborVoxelType != VoxelType.Air) continue;
@@ -196,6 +140,9 @@ namespace Chunk
                             
                         vertices.Add(vertex);
                         normals.Add(normal);
+                        
+                        // TODO: Create a method to apply the color based on voxel type.
+                        
                         colors.Add(VoxelUtils.StoneColor);
 
                         boundsMin = Vector3.Min(boundsMin, vertex);
@@ -215,15 +162,88 @@ namespace Chunk
             }
         }
 
+        private void ApplyFaceCulling(
+            ref VoxelType neighborVoxelType,
+            in float currentChunkWorldX,
+            in float currentChunkWorldZ,
+            in int x, in int y, in int z,
+            in Vector3Int normal,
+            in int voxelStartIndex)
+        {
+            var neighborGlobalX = currentChunkWorldX + x + normal.x;
+            var neighborGlobalY = y + normal.y;
+            var neighborGlobalZ = currentChunkWorldZ + z + normal.z;
+            
+            // First, check Y bounds (outside the world vertically is always air).
+            if (neighborGlobalY < 0 || neighborGlobalY >= _chunkSizeY)
+            {
+                neighborVoxelType = VoxelType.Air;
+            }
+            else
+            {
+                // Determine if the neighbor is within the current chunk's XZ bounds (locally 0 to chunkSize-1).
+                var isNeighborInSameChunkXZ = 
+                    (x + normal.x >= 0 && x + normal.x < _chunkSize &&
+                     z + normal.z >= 0 && z + normal.z < _chunkSize);
+
+                if (isNeighborInSameChunkXZ)
+                {
+                    // Neighbor voxel is within the current chunk's local XZ bounds
+                    var neighborLocalX = x + normal.x;
+                    var neighborLocalY = y + normal.y;
+                    var neighborLocalZ = z + normal.z;
+                    
+                    var neighborVoxelLocalIndex = ChunkUtils.Flatten3DLocalCoordsToIndex(
+                        0, neighborLocalX, neighborLocalY, neighborLocalZ, _chunkSize, _chunkSizeY);
+                    
+                    neighborVoxelType = _voxelDataArray[voxelStartIndex + neighborVoxelLocalIndex].type;
+                }
+                else // Neighbor is in an adjacent chunk (or outside the generated area horizontally)
+                {
+                    // Calculate target chunk grid coordinates.
+                    var targetChunkGridX = Mathf.FloorToInt(neighborGlobalX / _chunkSize);
+                    var targetChunkGridZ = Mathf.FloorToInt(neighborGlobalZ / _chunkSize);
+                    
+                    // If the target chunk's grid coordinates are out the generated world bounds, skip it. 
+                    if (targetChunkGridX < -_chunksToGenerate || targetChunkGridX >= _chunksToGenerate ||
+                        targetChunkGridZ < -_chunksToGenerate || targetChunkGridZ >= _chunksToGenerate) return;
+                    
+                    // Calculate target local voxel coordinates within that chunk.
+                    var targetVoxelLocalX = (int)((neighborGlobalX % _chunkSize + _chunkSize) % _chunkSize);
+                    var targetVoxelLocalY = (int)((neighborGlobalY % _chunkSizeY + _chunkSizeY) % _chunkSizeY);
+                    var targetVoxelLocalZ = (int)((neighborGlobalZ % _chunkSize + _chunkSize) % _chunkSize);
+                    
+                    // Convert chunk grid coordinates to linear index in chunkDataArray
+                    var targetChunkIndex = (targetChunkGridZ + _chunksToGenerate) * 
+                                           (_chunksToGenerate * 2) + // 2 Axis
+                                           (targetChunkGridX + _chunksToGenerate);
+                    
+                    // If the target chunk are out the valid bounds of generated chunks, skip it.
+                    if (targetChunkIndex < 0 || targetChunkIndex >= _chunkDataArray.Length) return;
+                    
+                    var targetVoxelAbsoluteIndex = (targetChunkIndex * _chunkVoxelCount) +
+                                                   ChunkUtils.Flatten3DLocalCoordsToIndex(
+                                                       0, targetVoxelLocalX, targetVoxelLocalY, targetVoxelLocalZ,
+                                                       _chunkSize, _chunkSizeY);
+                        
+                    // Check if the target voxel absolute index is within bounds of the overall voxelDataArray.
+                    if (targetVoxelAbsoluteIndex >= 0 && targetVoxelAbsoluteIndex < _voxelDataArray.Length)
+                    {
+                        neighborVoxelType = _voxelDataArray[targetVoxelAbsoluteIndex].type;
+                    }
+                }
+            }
+        }
+
         private void SetMeshDataBuffers(
             ref Mesh.MeshData chunkMeshData,
             ref NativeList<Vector3> vertices,
             ref NativeList<int> triangles,
             ref NativeList<Vector3> normals,
             ref NativeList<Color32> colors,
-            ref Vector3 boundsMin,
-            ref Vector3 boundsMax,
-            int chunkIndex)
+            in Vector3 boundsMin,
+            in Vector3 boundsMax,
+            in int chunkIndex)
         {
             var vertexAttributes = new NativeArray<VertexAttributeDescriptor>
                 (3, Allocator.Temp, NativeArrayOptions.UninitializedMemory);

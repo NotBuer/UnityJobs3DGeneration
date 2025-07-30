@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using UnityEngine.Serialization;
 
 namespace Voxel
 {
@@ -7,11 +8,11 @@ namespace Voxel
     [StructLayout(LayoutKind.Sequential)]
     public struct VoxelData
     {
-        public VoxelType _type;
+        public VoxelType type;
 
         public VoxelData(VoxelType type)
         {
-            _type = type;
+            this.type = type;
         }
     }
 }

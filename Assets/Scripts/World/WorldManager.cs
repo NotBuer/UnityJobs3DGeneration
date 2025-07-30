@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Chunk;
 using Unity.Collections;
 using Unity.Jobs;
@@ -15,8 +16,8 @@ namespace World
         [Range(1, 16)] [SerializeField] private byte chunkSize = 16;
         [Range(1, 255)] [SerializeField] private byte chunkSizeY = 255;
         [Range(1, 6)] [SerializeField] private byte chunksToGenerate = 1;
-    	[SerializeField] private float frequency;
-        [SerializeField] private float amplitude;
+    	[SerializeField] private float frequency = 0.01f;
+        [SerializeField] private float amplitude = 32f;
     
         private NativeArray<ChunkData> chunkDataArray;
         private NativeArray<VoxelData> voxelDataArray;
@@ -62,7 +63,7 @@ namespace World
             chunkMeshJobHandle.Complete();
             
             var chunkMeshes = new List<Mesh>(chunkMeshDataArray.Length);
-            foreach (var chunkCoord in chunkDataArray) chunkMeshes.Add(new Mesh());
+            chunkMeshes.AddRange(chunkDataArray.Select(_ => new Mesh()));
             Mesh.ApplyAndDisposeWritableMeshData(chunkMeshDataArray, chunkMeshes);
             
             var materialDefault = new Material(Shader.Find("Custom/UnlitVertexColor"));
