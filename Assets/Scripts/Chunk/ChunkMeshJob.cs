@@ -1,3 +1,4 @@
+using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
@@ -101,10 +102,10 @@ namespace Chunk
         {
             for (var voxelIndex = 0; voxelIndex < _chunkVoxelCount; voxelIndex++)
             {
-                if (_voxelDataArray[voxelStartIndex + voxelIndex].type == VoxelType.Air)
-                    continue;
-
                 var voxelType = _voxelDataArray[voxelStartIndex + voxelIndex].type;
+                
+                if (voxelType == VoxelType.Air)
+                    continue;
                 
                 var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, _chunkSize, _chunkSizeY);
     
@@ -141,9 +142,9 @@ namespace Chunk
                         vertices.Add(vertex);
                         normals.Add(normal);
                         
-                        // TODO: Create a method to apply the color based on voxel type.
-                        
-                        colors.Add(VoxelUtils.StoneColor);
+                        ApplyColorData(
+                            in voxelType,
+                            ref colors);
 
                         boundsMin = Vector3.Min(boundsMin, vertex);
                         boundsMax = Vector3.Max(boundsMax, vertex);
@@ -233,6 +234,19 @@ namespace Chunk
                     }
                 }
             }
+        }
+
+        private void ApplyColorData(
+            in VoxelType voxelType,
+            ref NativeList<Color32> colors)
+        {
+            colors.Add(voxelType switch
+            {
+                VoxelType.Grass => VoxelUtils.GrassColor,
+                VoxelType.Dirt => VoxelUtils.DirtColor,
+                VoxelType.Stone => VoxelUtils.StoneColor,
+                _ => throw new ArgumentOutOfRangeException(nameof(voxelType), voxelType, null)
+            });
         }
 
         private void SetMeshDataBuffers(

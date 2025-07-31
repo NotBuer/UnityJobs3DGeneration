@@ -66,7 +66,7 @@ namespace World
             chunkMeshes.AddRange(chunkDataArray.Select(_ => new Mesh()));
             Mesh.ApplyAndDisposeWritableMeshData(chunkMeshDataArray, chunkMeshes);
             
-            var materialDefault = new Material(Shader.Find("Custom/UnlitVertexColor"));
+            var material = new Material(Shader.Find("Custom/VoxelShader_WithLighting"));
     
             for (byte i = 0; i < chunkMeshes.Count; i++)
             {
@@ -79,7 +79,7 @@ namespace World
                 
                 var meshRenderer = chunkGameObject.AddComponent<MeshRenderer>();
                 meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
-                meshRenderer.material = materialDefault;
+                meshRenderer.material = material;
             }
         }
     

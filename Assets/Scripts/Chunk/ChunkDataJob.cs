@@ -124,9 +124,9 @@ namespace Chunk
                     {
                         var voxelType = voxelY switch
                         {
-                            _ when voxelY <= height => VoxelType.Grass,
-                            _ when voxelY == height - 2 => VoxelType.Dirt,
-                            _ when voxelY == height - 5 => VoxelType.Stone,
+                            _ when voxelY >= height - 2 && voxelY <= height     => VoxelType.Grass,
+                            _ when voxelY >= height - 4 && voxelY <= height - 2 => VoxelType.Dirt,
+                            _ when voxelY >= height - 6 && voxelY <= height - 4 => VoxelType.Stone,
                             _ => VoxelType.Air
                         };
 
