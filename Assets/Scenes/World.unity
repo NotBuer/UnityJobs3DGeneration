@@ -213,7 +213,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chunkSize: 16
   chunkSizeY: 255
-  chunksToGenerate: 6
+  chunksToGenerate: 4
   frequency: 0.01
   amplitude: 32
 --- !u!4 &138600323

@@ -15,7 +15,7 @@ namespace World
         
         [Range(1, 16)] [SerializeField] private byte chunkSize = 16;
         [Range(1, 255)] [SerializeField] private byte chunkSizeY = 255;
-        [Range(1, 6)] [SerializeField] private byte chunksToGenerate = 1;
+        [Range(1, 16)] [SerializeField] private byte chunksToGenerate = 1;
     	[SerializeField] private float frequency = 0.01f;
         [SerializeField] private float amplitude = 32f;
     
@@ -28,11 +28,11 @@ namespace World
         
         private void Awake()
         {
-            var renderDistancePerAxis =
-                chunksToGenerate * RenderDistanceAxisCount * chunksToGenerate * RenderDistanceAxisCount;
+            var chunksPerAxis = chunksToGenerate * RenderDistanceAxisCount;
+            var totalChunks = chunksPerAxis * chunksPerAxis;
             
             chunkDataArray = new NativeArray<ChunkData>(
-                renderDistancePerAxis, Allocator.Persistent);
+                totalChunks, Allocator.Persistent);
             
             voxelDataArray = new NativeArray<VoxelData>(
                 chunkDataArray.Length * (chunkSize * chunkSize * chunkSizeY), Allocator.Persistent);

@@ -129,11 +129,9 @@ namespace Chunk
                             _ when voxelY >= height - 6 && voxelY <= height - 4 => VoxelType.Stone,
                             _ => VoxelType.Air
                         };
-
-                        var voxelIndex = ChunkUtils.Flatten3DLocalCoordsToIndex(
-                            chunkVoxelStartIndex, voxelX, voxelY, voxelZ, _chunkSize, _chunkSizeY);
     
-                        _voxelDataArray[voxelIndex] = new VoxelData(voxelType);
+                        _voxelDataArray[ChunkUtils.Flatten3DLocalCoordsToIndex(
+                            chunkVoxelStartIndex, voxelX, voxelY, voxelZ, _chunkSize, _chunkSizeY)] = new VoxelData(voxelType);
                     }
                 }
             }
