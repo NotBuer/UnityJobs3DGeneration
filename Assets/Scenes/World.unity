@@ -244,7 +244,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   currentSeed: boer12345
-  generateRandomSeed: 0
+  generateRandomSeed: 1
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

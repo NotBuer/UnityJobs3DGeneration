@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Chunk
 {
     public static class ChunkUtils
@@ -11,6 +13,7 @@ namespace Chunk
         /// <param name="chunkSize">The size (length and width) of the chunk in number of voxels.</param>
         /// <param name="chunkSizeY">The height of the chunk in number of voxels.</param>
         /// <returns>A single integer representing the 1D index of the voxel, relative to its chunk.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Flatten3DLocalCoordsToIndex(
             int voxelX, int voxelY, int voxelZ, int chunkSize, int chunkSizeY)
             => (voxelX * chunkSize * chunkSizeY) +
@@ -27,6 +30,7 @@ namespace Chunk
         /// <param name="chunkSize">The size (length and width) of the chunk in number of voxels.</param>
         /// <param name="chunkSizeY">The height of the chunk in number of voxels.</param>
         /// <returns>A single integer representing the 1D index of the voxel within the chunk's linear array.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Flatten3DLocalCoordsToIndex(
             int voxelIndex, int voxelX, int voxelY, int voxelZ, int chunkSize, int chunkSizeY) 
             => voxelIndex + 
@@ -41,6 +45,7 @@ namespace Chunk
         /// <param name="chunkSize">The size (length and width) of the chunk in number of voxels.</param>
         /// <param name="chunkSizeY">The height of the chunk in number of voxels.</param>
         /// <returns>A tuple containing the X, Y, and Z local coordinates of the voxel within the chunk.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static (int x, int y, int z) UnflattenIndexTo3DLocalCoords(
             int localVoxelIndex, int chunkSize, int chunkSizeY)
             => (

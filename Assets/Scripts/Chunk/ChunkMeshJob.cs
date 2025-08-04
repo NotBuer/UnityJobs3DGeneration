@@ -290,8 +290,10 @@
 
 #region NEW_VERSION
 using System;
+using LowLevel;
 using Unity.Burst;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -300,7 +302,7 @@ using Voxel;
 namespace Chunk
 {
     [BurstCompile]
-    public struct ChunkMeshJob : IJobParallelFor
+    public unsafe struct ChunkMeshJob : IJobParallelFor
     {
         private Mesh.MeshDataArray _chunkMeshDataArray;
         private NativeArray<Bounds> _chunkBoundsArray;
@@ -374,11 +376,11 @@ namespace Chunk
                 in boundsMin,
                 in boundsMax,
                 in index);
-
-            vertices.Dispose();
-            triangles.Dispose();
-            normals.Dispose();
-            colors.Dispose();
+            
+            vertices->Dispose();
+            triangles->Dispose();
+            normals->Dispose();
+            colors->Dispose();
         }
         
         private void FirstPassGetVisibleFacesLocal(
@@ -413,23 +415,23 @@ namespace Chunk
         private void SecondPassGetVisibleFacesGlobal(
             in int visibleFaces,
             in int voxelStartIndex,
-            out NativeList<Vector3> vertices,
-            out NativeList<int> triangles,
-            out NativeList<Vector3> normals,
-            out NativeList<Color32> colors,
+            out UnsafeList<Vector3>* vertices,
+            out UnsafeList<int>* triangles,
+            out UnsafeList<Vector3>* normals,
+            out UnsafeList<Color32>* colors,
             in float currentChunkWorldX,
             in float currentChunkWorldZ,
             in bool firstPass,
             ref Vector3 boundsMin,
             ref Vector3 boundsMax)
         {
-            var bufferVertexCount = Mathf.FloorToInt(visibleFaces * 1.4f * VoxelUtils.FaceEdges);
-            var bufferTriangleCount = Mathf.FloorToInt(visibleFaces * 1.4f * VoxelUtils.FaceCount);
+            var bufferVertexCount = Mathf.FloorToInt(visibleFaces * 1.3125f * VoxelUtils.FaceEdges);
+            var bufferTriangleCount = Mathf.FloorToInt(visibleFaces * 1.3125f * VoxelUtils.FaceCount);
             
-            vertices = new NativeList<Vector3>(bufferVertexCount, Allocator.Temp);
-            triangles = new NativeList<int>(bufferTriangleCount, Allocator.Temp);
-            normals = new NativeList<Vector3>(bufferVertexCount, Allocator.Temp);
-            colors = new NativeList<Color32>(bufferVertexCount, Allocator.Temp);
+            vertices = UnsafeList<Vector3>.Create(bufferVertexCount, Allocator.Temp);
+            triangles = UnsafeList<int>.Create(bufferTriangleCount, Allocator.Temp);
+            normals = UnsafeList<Vector3>.Create(bufferVertexCount, Allocator.Temp);
+            colors = UnsafeList<Color32>.Create(bufferVertexCount, Allocator.Temp);
 
             var vertexIndex = 0;
             
@@ -465,21 +467,21 @@ namespace Chunk
                             voxelPosition +
                             VoxelUtils.Vertices[VoxelUtils.FaceVertices[faceIndex * VoxelUtils.FaceEdges + j]];
                         
-                        vertices.Add(vertex);
-                        normals.Add(normal);
-                        colors.Add(GetVoxelColor(in voxelType));
+                        vertices->AddNoResize(vertex);
+                        normals->AddNoResize(normal);
+                        colors->AddNoResize(GetVoxelColor(in voxelType));
                         
                         boundsMin = Vector3.Min(boundsMin, vertex);
                         boundsMax = Vector3.Max(boundsMax, vertex);
                     }
                     
                     // Add 2 triangles for the face using an anti-clockwise direction.
-                    triangles.Add(vertexIndex);
-                    triangles.Add(vertexIndex + 3);
-                    triangles.Add(vertexIndex + 2);
-                    triangles.Add(vertexIndex);
-                    triangles.Add(vertexIndex + 2);
-                    triangles.Add(vertexIndex + 1);
+                    triangles->AddNoResize(vertexIndex);
+                    triangles->AddNoResize(vertexIndex + 3);
+                    triangles->AddNoResize(vertexIndex + 2);
+                    triangles->AddNoResize(vertexIndex);
+                    triangles->AddNoResize(vertexIndex + 2);
+                    triangles->AddNoResize(vertexIndex + 1);
                     
                     vertexIndex += VoxelUtils.FaceEdges;
                 }
@@ -571,10 +573,10 @@ namespace Chunk
 
         private void SetMeshDataBuffers(
             ref Mesh.MeshData chunkMeshData,
-            ref NativeList<Vector3> vertices,
-            ref NativeList<int> triangles,
-            ref NativeList<Vector3> normals,
-            ref NativeList<Color32> colors,
+            ref UnsafeList<Vector3>* vertices,
+            ref UnsafeList<int>* triangles,
+            ref UnsafeList<Vector3>* normals,
+            ref UnsafeList<Color32>* colors,
             in Vector3 boundsMin,
             in Vector3 boundsMax,
             in int chunkIndex)
@@ -589,20 +591,23 @@ namespace Chunk
             vertexAttributes[2] = new VertexAttributeDescriptor
                 (VertexAttribute.Color, VertexAttributeFormat.UNorm8, dimension: 4, stream: 2);
             
-            chunkMeshData.SetVertexBufferParams(vertices.Length, vertexAttributes);
+            chunkMeshData.SetVertexBufferParams(vertices->Length, vertexAttributes);
             vertexAttributes.Dispose();
             
-            chunkMeshData.SetIndexBufferParams(triangles.Length, IndexFormat.UInt32);
-                
-            chunkMeshData.GetVertexData<Vector3>(0).CopyFrom(vertices.AsArray());
-            chunkMeshData.GetVertexData<Vector3>(1).CopyFrom(normals.AsArray());
-            chunkMeshData.GetVertexData<Color32>(2).CopyFrom(colors.AsArray());
-            chunkMeshData.GetIndexData<int>().CopyFrom(triangles.AsArray());
+            chunkMeshData.SetIndexBufferParams(triangles->Length, IndexFormat.UInt32);
+            
+            chunkMeshData.GetVertexData<Vector3>(0).CopyFrom(NativeArrayUnsafe.AsNativeArray(vertices));
+            chunkMeshData.GetVertexData<Vector3>(1).CopyFrom(NativeArrayUnsafe.AsNativeArray(normals));
+            chunkMeshData.GetVertexData<Color32>(2).CopyFrom(NativeArrayUnsafe.AsNativeArray(colors));
+            chunkMeshData.GetIndexData<int>().CopyFrom(NativeArrayUnsafe.AsNativeArray(triangles));
             
             chunkMeshData.subMeshCount = 1;
-            chunkMeshData.SetSubMesh(0, new SubMeshDescriptor(0, triangles.Length), 
-                MeshUpdateFlags.DontValidateIndices | MeshUpdateFlags.DontResetBoneBounds | 
-                MeshUpdateFlags.DontNotifyMeshUsers | MeshUpdateFlags.DontRecalculateBounds );
+            chunkMeshData.SetSubMesh(0, 
+                new SubMeshDescriptor(0, triangles->Length), 
+                MeshUpdateFlags.DontValidateIndices | 
+                MeshUpdateFlags.DontResetBoneBounds | 
+                MeshUpdateFlags.DontNotifyMeshUsers | 
+                MeshUpdateFlags.DontRecalculateBounds);
             
             _chunkBoundsArray[chunkIndex] = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin);
         }
