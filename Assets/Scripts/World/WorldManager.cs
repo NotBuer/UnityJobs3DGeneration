@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Chunk;
@@ -5,6 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Serialization;
 using Voxel;
 
 namespace World
@@ -18,6 +20,7 @@ namespace World
         [Range(1, 16)] [SerializeField] private byte chunksToGenerate = 1;
     	[SerializeField] private float frequency = 0.01f;
         [SerializeField] private float amplitude = 32f;
+        [SerializeField] private Material worldDefaultMaterial;
     
         private NativeArray<ChunkData> chunkDataArray;
         private NativeArray<VoxelData> voxelDataArray;
@@ -48,7 +51,6 @@ namespace World
                 frequency, amplitude, chunkDataArray, voxelDataArray);
             
             chunkDataJobHandle = chunkDataJob.Schedule(chunkDataArray.Length, 1);
-            chunkDataJobHandle.Complete();
             
             var chunkMeshDataArray = Mesh.AllocateWritableMeshData(chunkDataArray.Length);
     
@@ -58,15 +60,24 @@ namespace World
                 chunkSize * chunkSize * chunkSizeY, 
                 chunkSize, chunkSizeY, chunksToGenerate, chunkDataArray, voxelDataArray);
             
-            chunkMeshJobHandle = chunkMeshJob.Schedule(
-                chunkMeshDataArray.Length, 1, chunkDataJobHandle);
-            chunkMeshJobHandle.Complete();
+            chunkMeshJobHandle = chunkMeshJob.Schedule(chunkMeshDataArray.Length, 1, chunkDataJobHandle);
             
-            var chunkMeshes = new List<Mesh>(chunkMeshDataArray.Length);
+            StartCoroutine(WaitForMeshAndRender(
+                JobHandle.CombineDependencies(chunkDataJobHandle, chunkMeshJobHandle), chunkMeshDataArray));
+        }
+
+        private IEnumerator WaitForMeshAndRender(JobHandle jobHandle, Mesh.MeshDataArray meshDataArray)
+        {
+            yield return new WaitUntil(() => jobHandle.IsCompleted);
+            jobHandle.Complete();
+            
+            var chunkMeshes = new List<Mesh>(meshDataArray.Length);
             chunkMeshes.AddRange(chunkDataArray.Select(_ => new Mesh()));
-            Mesh.ApplyAndDisposeWritableMeshData(chunkMeshDataArray, chunkMeshes);
-            
-            var material = new Material(Shader.Find("Custom/VoxelShader_WithLighting"));
+            Mesh.ApplyAndDisposeWritableMeshData(meshDataArray, chunkMeshes, 
+                MeshUpdateFlags.DontValidateIndices | 
+                MeshUpdateFlags.DontResetBoneBounds | 
+                MeshUpdateFlags.DontNotifyMeshUsers | 
+                MeshUpdateFlags.DontRecalculateBounds);
     
             for (byte i = 0; i < chunkMeshes.Count; i++)
             {
@@ -79,7 +90,9 @@ namespace World
                 
                 var meshRenderer = chunkGameObject.AddComponent<MeshRenderer>();
                 meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
-                meshRenderer.material = material;
+                meshRenderer.material = worldDefaultMaterial;
+
+                yield return null;
             }
         }
     
