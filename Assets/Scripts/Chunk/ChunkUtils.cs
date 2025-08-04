@@ -4,6 +4,10 @@ namespace Chunk
 {
     public static class ChunkUtils
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetChunkTotalSize(in byte chunkSize, in byte chunkSizeY) =>
+            chunkSize * chunkSize * chunkSizeY;
+        
         /// <summary>
         /// Flattens 3D local coordinates into a 1D index relative to the start of the chunk.
         /// </summary>

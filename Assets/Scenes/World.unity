@@ -211,9 +211,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0f0d27f3a63207e4ea215fae2f062134, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  buildChunkUsingParallelBatchJobs: 1
   chunkSize: 16
-  chunkSizeY: 255
-  chunksToGenerate: 3
+  chunkSizeY: 16
+  renderDistance: 6
   frequency: 0.01
   amplitude: 16
   worldDefaultMaterial: {fileID: 2100000, guid: d72454d5a5ad4664aa7e3089a5eee73e, type: 2}
@@ -245,7 +246,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   currentSeed: boer12345
-  generateRandomSeed: 1
+  generateRandomSeed: 0
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

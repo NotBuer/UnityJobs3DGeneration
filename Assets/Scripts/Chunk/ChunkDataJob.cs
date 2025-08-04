@@ -4,13 +4,14 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using Voxel;
+using World;
 
 namespace Chunk
 { 
     [BurstCompile]
     public struct ChunkDataJob : IJobParallelFor
     {
-        [ReadOnly] private readonly byte _chunksToGenerate;
+        [ReadOnly] private readonly byte _totalChunksPerAxis;
         [ReadOnly] private readonly byte _chunkSize;
         [ReadOnly] private readonly byte _chunkSizeY;
         [ReadOnly] private readonly ulong _seed;
@@ -22,7 +23,7 @@ namespace Chunk
         private readonly float2 _noiseOffset;
     
         public ChunkDataJob(
-            byte chunksToGenerate, 
+            byte totalChunksPerAxis,
             byte chunkSize, 
             byte chunkSizeY,
             ulong seed,
@@ -31,7 +32,7 @@ namespace Chunk
             NativeArray<ChunkData> chunkDataArray, 
             NativeArray<VoxelData> voxelDataArray) : this()
         {
-            _chunksToGenerate = chunksToGenerate;
+            _totalChunksPerAxis = totalChunksPerAxis;
             _chunkSize = chunkSize;
             _chunkSizeY = chunkSizeY;
             _seed = seed;
@@ -89,9 +90,9 @@ namespace Chunk
     
         public void Execute(int index)
         {
-            var chunkPerAxis = _chunksToGenerate * 2;
-            var chunkX = (index % chunkPerAxis) - _chunksToGenerate;
-            var chunkZ = (index / chunkPerAxis) - _chunksToGenerate;
+            var gridOffset = _totalChunksPerAxis / 2;
+            var chunkX = (index % _totalChunksPerAxis) - gridOffset;
+            var chunkZ = (index / _totalChunksPerAxis) - gridOffset;
             
             var currentChunkX = chunkX * _chunkSize;
             var currentChunkZ = chunkZ * _chunkSize;

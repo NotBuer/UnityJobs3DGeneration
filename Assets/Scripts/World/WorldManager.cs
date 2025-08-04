@@ -1,13 +1,13 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using Chunk;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Serialization;
 using Voxel;
+using Chunk;
 
 namespace World
 {
@@ -15,12 +15,19 @@ namespace World
     {
         private const byte RenderDistanceAxisCount = 2;
         
+        [Header("Performance")] 
+        [SerializeField] private bool buildChunkUsingParallelBatchJobs;
+        
+        [Header("World Settings")]
         [Range(1, 16)] [SerializeField] private byte chunkSize = 16;
         [Range(1, 255)] [SerializeField] private byte chunkSizeY = 255;
-        [Range(1, 16)] [SerializeField] private byte chunksToGenerate = 1;
+        [Range(2, 16)] [SerializeField] private byte renderDistance = 2;
     	[SerializeField] private float frequency = 0.01f;
         [SerializeField] private float amplitude = 32f;
         [SerializeField] private Material worldDefaultMaterial;
+
+        private byte totalChunksPerAxis;
+        private byte totalWorldGridDimension;
     
         private NativeArray<ChunkData> chunkDataArray;
         private NativeArray<VoxelData> voxelDataArray;
@@ -28,27 +35,56 @@ namespace World
         
         private JobHandle chunkDataJobHandle;
         private JobHandle chunkMeshJobHandle;
-        
-        private void Awake()
+
+        private void OnValidate()
         {
-            var chunksPerAxis = chunksToGenerate * RenderDistanceAxisCount;
-            var totalChunks = chunksPerAxis * chunksPerAxis;
+            renderDistance = (byte)(renderDistance % 2 == 0 ? renderDistance : renderDistance + 1);
+        }
+
+        private void Awake() 
+        {
+            totalChunksPerAxis = (byte)(renderDistance * RenderDistanceAxisCount); 
+            Debug.Log($"Number of total chunks per axis: {totalChunksPerAxis}");
+            totalWorldGridDimension = (byte)(totalChunksPerAxis * totalChunksPerAxis);
+            Debug.Log($"Total world grid dimension size (in chunks): {totalWorldGridDimension}");
             
+            PreAllocateBuffers();
+        }
+        
+        private void Start()
+        {
+            if (buildChunkUsingParallelBatchJobs)
+            {
+                SetupJobsAndScheduling_ParallelBatchJobs();
+                return;
+            }
+            
+            SetupJobsAndScheduling_SingleTaskJobs();
+        }
+        
+        private void PreAllocateBuffers()
+        {
             chunkDataArray = new NativeArray<ChunkData>(
-                totalChunks, Allocator.Persistent);
+                totalWorldGridDimension, Allocator.Persistent);
             
             voxelDataArray = new NativeArray<VoxelData>(
-                chunkDataArray.Length * (chunkSize * chunkSize * chunkSizeY), Allocator.Persistent);
+                chunkDataArray.Length * ChunkUtils.GetChunkTotalSize(chunkSize, chunkSizeY), Allocator.Persistent);
             
             chunkBoundsArray = new NativeArray<Bounds>(
                 chunkDataArray.Length, Allocator.Persistent);
         }
-    
-        private void Start()
+
+        private void SetupJobsAndScheduling_ParallelBatchJobs()
         {
             var chunkDataJob = new ChunkDataJob(
-                chunksToGenerate, chunkSize, chunkSizeY, WorldSeed.Instance.CurrentSeedHashCode,
-                frequency, amplitude, chunkDataArray, voxelDataArray);
+                totalChunksPerAxis, 
+                chunkSize, 
+                chunkSizeY, 
+                WorldSeed.Instance.CurrentSeedHashCode,
+                frequency, 
+                amplitude, 
+                chunkDataArray, 
+                voxelDataArray);
             
             chunkDataJobHandle = chunkDataJob.Schedule(chunkDataArray.Length, 1);
             
@@ -57,13 +93,28 @@ namespace World
             var chunkMeshJob = new ChunkMeshJob(
                 chunkMeshDataArray,
                 chunkBoundsArray,
-                chunkSize * chunkSize * chunkSizeY, 
-                chunkSize, chunkSizeY, chunksToGenerate, chunkDataArray, voxelDataArray);
+                ChunkUtils.GetChunkTotalSize(chunkSize, chunkSizeY), 
+                chunkSize, 
+                chunkSizeY, 
+                totalChunksPerAxis,
+                chunkDataArray, 
+                voxelDataArray);
             
             chunkMeshJobHandle = chunkMeshJob.Schedule(chunkMeshDataArray.Length, 1, chunkDataJobHandle);
             
             StartCoroutine(WaitForMeshAndRender(
                 JobHandle.CombineDependencies(chunkDataJobHandle, chunkMeshJobHandle), chunkMeshDataArray));
+        }
+
+        private void SetupJobsAndScheduling_SingleTaskJobs()
+        {
+            StartCoroutine(YieldedScheduleSingleTaskJobs());
+        }
+
+        private IEnumerator YieldedScheduleSingleTaskJobs()
+        {
+            
+            yield return null;
         }
 
         private IEnumerator WaitForMeshAndRender(JobHandle jobHandle, Mesh.MeshDataArray meshDataArray)
@@ -98,10 +149,13 @@ namespace World
     
         private void OnApplicationQuit()
         {
+            StopAllCoroutines();
+            Debug.Log("All coroutines stopped!");
+            
             chunkDataArray.Dispose();
             voxelDataArray.Dispose();
             chunkBoundsArray.Dispose();
-            Debug.Log("All native arrays disposed");
+            Debug.Log("All native arrays disposed!");
         }
     }
 }
