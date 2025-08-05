@@ -17,7 +17,7 @@ namespace Chunk
         private NativeArray<Bounds> _chunkBoundsArray;
         [ReadOnly] private readonly int _chunkVoxelCount;
         [ReadOnly] private readonly byte _chunkSize;
-        [ReadOnly] private readonly int _chunkSizeY;
+        [ReadOnly] private readonly byte _chunkSizeY;
         [ReadOnly] private readonly byte _totalChunksPerAxis;
         [ReadOnly] private NativeArray<ChunkData> _chunkDataArray;
         [ReadOnly] private readonly NativeArray<VoxelData> _voxelDataArray;
@@ -277,7 +277,7 @@ namespace Chunk
             ref UnsafeList<Color32>* colors,
             in Vector3 boundsMin,
             in Vector3 boundsMax,
-            in int chunkIndex)
+            in int index)
         {
             var vertexAttributes = new NativeArray<VertexAttributeDescriptor>
                 (3, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
@@ -307,7 +307,7 @@ namespace Chunk
                 MeshUpdateFlags.DontNotifyMeshUsers | 
                 MeshUpdateFlags.DontRecalculateBounds);
             
-            _chunkBoundsArray[chunkIndex] = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin);
+            _chunkBoundsArray[index] = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin);
         }
     }
 }

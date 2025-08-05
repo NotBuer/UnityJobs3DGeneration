@@ -91,8 +91,9 @@ namespace Chunk
         public void Execute(int index)
         {
             var gridOffset = _totalChunksPerAxis / 2;
-            var chunkX = (index % _totalChunksPerAxis) - gridOffset;
-            var chunkZ = (index / _totalChunksPerAxis) - gridOffset;
+            var (chunkX, chunkZ) = WorldUtils.UnflattenIndexToGrid((ushort)index, in _totalChunksPerAxis);
+            chunkX -= gridOffset;
+            chunkZ -= gridOffset;
             
             var currentChunkX = chunkX * _chunkSize;
             var currentChunkZ = chunkZ * _chunkSize;

@@ -6,7 +6,7 @@ namespace Voxel
     {
         public const byte FaceCount = 6;
         public const byte FaceEdges = 4;
-
+        
         public static readonly Vector3[] Vertices = new Vector3[8]
         {
             new(-0.5f, -0.5f,  0.5f), // Back bottom-left
