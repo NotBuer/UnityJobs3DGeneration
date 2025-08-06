@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,6 +15,9 @@ namespace World
     {
         private const byte RenderDistanceAxisCount = 2;
         
+        private Action _onWorldGenStart;
+        private Action _onWorldGenEnd;
+        
         [Header("Performance")] 
         [SerializeField] private bool useHybridJobs;
         [Range(2, 256)] [SerializeField] private byte parallelForInnerLoopBatchCount = 32;
@@ -25,6 +29,8 @@ namespace World
     	[SerializeField] private float frequency = 0.01f;
         [SerializeField] private float amplitude = 32f;
         [SerializeField] private Material worldDefaultMaterial;
+        
+        private bool generatingWorld = false;
 
         private byte _totalChunksPerAxis;
         private ushort _totalWorldGridDimension;
@@ -43,6 +49,11 @@ namespace World
                 parallelForInnerLoopBatchCount++ : parallelForInnerLoopBatchCount;
         }
 
+        private void OnDrawGizmos()
+        {
+            if (generatingWorld) return;
+        }
+
         private void Awake() 
         {
             _totalChunksPerAxis = (byte)(renderDistance * RenderDistanceAxisCount); 
@@ -50,11 +61,16 @@ namespace World
             _totalWorldGridDimension = (ushort)(_totalChunksPerAxis * _totalChunksPerAxis);
             Debug.Log($"Total world grid dimension size (in chunks): {_totalWorldGridDimension}");
             
+            _onWorldGenStart += OnWorldGenStart;
+            _onWorldGenEnd += OnWorldGenEnd;
+            
             PreAllocateBuffers();
         }
-        
+
         private void Start()
         {
+            _onWorldGenStart.Invoke();
+            
             if (useHybridJobs)
             {
                 Debug.Log("World generation pipeline -> Hybrid ('IJobParallelFor + IJob') jobs.");
@@ -97,11 +113,11 @@ namespace World
             for (ushort i = 0; i < _totalWorldGridDimension; i++)
             {
                 var meshDataArray = Mesh.AllocateWritableMeshData(1);
-                var boundsArray = new NativeArray<Bounds>(1, Allocator.TempJob);
+                var boundsRef = new NativeReference<Bounds>(Allocator.TempJob);
                 
                 var meshJob = new SingleChunkMeshJob(
                     meshDataArray,
-                    boundsArray,
+                    boundsRef,
                     ChunkUtils.GetChunkTotalSize(chunkSize, chunkSizeY), 
                     chunkSize, 
                     chunkSizeY, 
@@ -113,14 +129,16 @@ namespace World
                 var meshJobHandle = meshJob.Schedule(dataJobHandle);
                 
                 StartCoroutine(
-                    WaitForMeshAndRender_HybridJobs(meshJobHandle, meshDataArray, boundsArray, i));
+                    WaitForMeshAndRender_HybridJobs(meshJobHandle, meshDataArray, boundsRef, i));
             }
+            
+            _onWorldGenEnd.Invoke();
         }
 
         private IEnumerator WaitForMeshAndRender_HybridJobs(
             JobHandle jobHandle, 
             Mesh.MeshDataArray meshDataArray,
-            NativeArray<Bounds> boundsArray,
+            NativeReference<Bounds> boundsRef,
             ushort index)
         {
             yield return new WaitUntil(() => jobHandle.IsCompleted);
@@ -134,8 +152,8 @@ namespace World
                 MeshUpdateFlags.DontNotifyMeshUsers | 
                 MeshUpdateFlags.DontRecalculateBounds);
             
-           mesh.bounds = boundsArray[0];
-           boundsArray.Dispose();
+           mesh.bounds = boundsRef.Value;
+           boundsRef.Dispose();
            
            var chunkGameObject = new GameObject 
                { name = $"Chunk - X:{chunkDataArray[index].x}, Z:{chunkDataArray[index].z}" };
@@ -181,6 +199,8 @@ namespace World
             
             StartCoroutine(WaitForMeshAndRender_ParallelBatchJobs(
                 JobHandle.CombineDependencies(chunkDataJobHandle, chunkMeshJobHandle), chunkMeshDataArray));
+            
+            _onWorldGenEnd.Invoke();
         }
         
         private IEnumerator WaitForMeshAndRender_ParallelBatchJobs(
@@ -217,16 +237,29 @@ namespace World
         }
         #endregion
         
+        private void OnWorldGenStart()
+        {
+            generatingWorld = true;
+        }
+        
+        private void OnWorldGenEnd()
+        {
+            generatingWorld = false;
+        }
     
         private void OnApplicationQuit()
         {
+            _onWorldGenStart -= OnWorldGenStart;
+            _onWorldGenEnd -= _onWorldGenEnd;
+            Debug.Log($"{nameof(WorldManager)}.{nameof(OnApplicationQuit)} - Unsubscribed events!");
+            
             StopAllCoroutines();
-            Debug.Log("All coroutines stopped!");
+            Debug.Log($"{nameof(WorldManager)}.{nameof(OnApplicationQuit)} - All coroutines stopped!");
             
             chunkDataArray.Dispose();
             voxelDataArray.Dispose();
             chunkBoundsArray.Dispose();
-            Debug.Log("All native arrays disposed!");
+            Debug.Log($"{nameof(WorldManager)}.{nameof(OnApplicationQuit)} - All native containers disposed!");
         }
     }
 }

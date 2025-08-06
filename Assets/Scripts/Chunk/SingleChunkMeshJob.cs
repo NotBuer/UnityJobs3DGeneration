@@ -13,7 +13,7 @@ namespace Chunk
     public unsafe struct SingleChunkMeshJob : IJob
     {
         private Mesh.MeshDataArray _chunkMeshDataArray;
-        [WriteOnly] private NativeArray<Bounds> _chunkBoundsArray;
+        [WriteOnly] private NativeReference<Bounds> _chunkBoundsRef;
         [ReadOnly] private readonly int _chunkVoxelCount;
         [ReadOnly] private readonly byte _chunkSize;
         [ReadOnly] private readonly byte _chunkSizeY;
@@ -24,7 +24,7 @@ namespace Chunk
     
         public SingleChunkMeshJob(
             Mesh.MeshDataArray chunkMeshDataArray, 
-            NativeArray<Bounds> chunkBoundsArray,
+            NativeReference<Bounds> chunkBoundsRef,
             int chunkVoxelCount,
             byte chunkSize,
             byte chunkSizeY,
@@ -34,7 +34,7 @@ namespace Chunk
             ushort index)
         {
             _chunkMeshDataArray = chunkMeshDataArray;
-            _chunkBoundsArray = chunkBoundsArray;
+            _chunkBoundsRef = chunkBoundsRef;
             _chunkVoxelCount = chunkVoxelCount;
             _chunkSize = chunkSize;
             _chunkSizeY = chunkSizeY;
@@ -306,7 +306,7 @@ namespace Chunk
                 MeshUpdateFlags.DontNotifyMeshUsers | 
                 MeshUpdateFlags.DontRecalculateBounds);
             
-            _chunkBoundsArray[0] = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin);
+            _chunkBoundsRef.Value = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin);
         }
     }   
 }

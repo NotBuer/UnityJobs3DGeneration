@@ -14,12 +14,12 @@ namespace Chunk
     public unsafe struct ChunkMeshJob : IJobParallelFor
     {
         private Mesh.MeshDataArray _chunkMeshDataArray;
-        private NativeArray<Bounds> _chunkBoundsArray;
+        [WriteOnly] private NativeArray<Bounds> _chunkBoundsArray;
         [ReadOnly] private readonly int _chunkVoxelCount;
         [ReadOnly] private readonly byte _chunkSize;
         [ReadOnly] private readonly byte _chunkSizeY;
         [ReadOnly] private readonly byte _totalChunksPerAxis;
-        [ReadOnly] private NativeArray<ChunkData> _chunkDataArray;
+        [ReadOnly] private readonly NativeArray<ChunkData> _chunkDataArray;
         [ReadOnly] private readonly NativeArray<VoxelData> _voxelDataArray;
     
         public ChunkMeshJob(
