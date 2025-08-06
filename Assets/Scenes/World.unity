@@ -214,10 +214,10 @@ MonoBehaviour:
   useHybridJobs: 1
   parallelForInnerLoopBatchCount: 32
   chunkSize: 16
-  chunkSizeY: 16
-  renderDistance: 8
+  chunkSizeY: 64
+  renderDistance: 6
   frequency: 0.01
-  amplitude: 16
+  amplitude: 32
   worldDefaultMaterial: {fileID: 2100000, guid: d72454d5a5ad4664aa7e3089a5eee73e, type: 2}
 --- !u!4 &138600323
 Transform:
@@ -246,7 +246,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e55d8aec1c953c64ab81e22a63d296e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentSeed: boer12345
+  currentSeed: boereuteamo12345
   generateRandomSeed: 0
 --- !u!1 &330585543
 GameObject:

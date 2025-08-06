@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -49,15 +48,33 @@ namespace Camera
             
             var moveInput = _moveAction.ReadValue<Vector2>();
 
+            var movement = new Vector3(0f, 0f, 0f);
+            
+            switch (moveInput.x)
+            {
+                case > 0f:
+                    movement += transform.rotation * Vector3.right;
+                    break;
+                case < 0f:
+                    movement += transform.rotation * Vector3.left;
+                    break;
+            }
+            
+            switch (moveInput.y)
+            {
+                case > 0f:
+                    movement += transform.rotation * Vector3.forward;
+                    break;
+                case < 0f:
+                    movement += transform.rotation * Vector3.back;
+                    break;
+            }
+            
             var currentMoveSpeed = movementSpeed;
             if (_sprintAction.IsPressed())
-                currentMoveSpeed *= 2f;
+                currentMoveSpeed *= 3f;
 
-            var move = new Vector3(moveInput.x, transform.forward.y, moveInput.y);
-
-            move = Quaternion.Euler(0, transform.eulerAngles.y, 0) * move;
-
-            _transform.Translate(move * (currentMoveSpeed * Time.deltaTime), Space.World);
+            _transform.Translate(movement * (currentMoveSpeed * Time.deltaTime), Space.World);
         }
 
         private void CameraRotation()

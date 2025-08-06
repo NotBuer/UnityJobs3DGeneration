@@ -39,9 +39,6 @@ namespace World
         private NativeArray<VoxelData> voxelDataArray;
         private NativeArray<Bounds> chunkBoundsArray;
         
-        private JobHandle chunkDataJobHandle;
-        private JobHandle chunkMeshJobHandle;
-        
         private void OnValidate()
         {
             renderDistance = renderDistance % 2 != 0 ? renderDistance++ : renderDistance;
@@ -52,6 +49,17 @@ namespace World
         private void OnDrawGizmos()
         {
             if (generatingWorld) return;
+            
+            for (var i = 0; i < chunkDataArray.Length; i++)
+            {
+                var chunk = chunkDataArray[i];
+                var chunkBounds = chunkBoundsArray[i];
+                
+                Gizmos.color = Color.red;
+                Gizmos.DrawWireCube(
+                    new Vector3(chunk.x + (float)chunkSize / 2, 0f, chunk.z + (float)chunkSize / 2),
+                    new Vector3(chunkSize, chunkBounds.size.y, chunkSize));
+            }
         }
 
         private void Awake() 
@@ -180,7 +188,7 @@ namespace World
                 chunkDataArray, 
                 voxelDataArray);
             
-            chunkDataJobHandle = chunkDataJob.Schedule(chunkDataArray.Length, parallelForInnerLoopBatchCount);
+            var chunkDataJobHandle = chunkDataJob.Schedule(chunkDataArray.Length, parallelForInnerLoopBatchCount);
             
             var chunkMeshDataArray = Mesh.AllocateWritableMeshData(chunkDataArray.Length);
     
@@ -194,13 +202,11 @@ namespace World
                 chunkDataArray, 
                 voxelDataArray);
             
-            chunkMeshJobHandle = chunkMeshJob.Schedule(
+            var chunkMeshJobHandle = chunkMeshJob.Schedule(
                 chunkMeshDataArray.Length, parallelForInnerLoopBatchCount, chunkDataJobHandle);
             
             StartCoroutine(WaitForMeshAndRender_ParallelBatchJobs(
                 JobHandle.CombineDependencies(chunkDataJobHandle, chunkMeshJobHandle), chunkMeshDataArray));
-            
-            _onWorldGenEnd.Invoke();
         }
         
         private IEnumerator WaitForMeshAndRender_ParallelBatchJobs(
@@ -234,6 +240,8 @@ namespace World
 
                 yield return null;
             }
+            
+            _onWorldGenEnd.Invoke();
         }
         #endregion
         
