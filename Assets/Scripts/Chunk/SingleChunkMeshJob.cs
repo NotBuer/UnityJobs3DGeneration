@@ -55,7 +55,7 @@ namespace Chunk
 
             var visibleFaces = 0;
             
-            MeshJobCore.FirstPassGetVisibleFacesLocal(
+            ChunkMeshCore.FirstPassGetVisibleFacesLocal(
                 in _chunkVoxelCount,
                 in _voxelDataArray,
                 in _chunkSize,
@@ -67,7 +67,7 @@ namespace Chunk
                 ref visibleFaces,
                 true);
             
-            MeshJobCore.SecondPassGetVisibleFacesGlobal(
+            ChunkMeshCore.SecondPassGetVisibleFacesGlobal(
                 in _chunkVoxelCount,
                 in _voxelDataArray,
                 in _chunkSize,
@@ -87,7 +87,7 @@ namespace Chunk
             
             _chunkBoundsRef.Value = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin);
             
-            MeshJobCore.SetMeshDataBuffers(
+            ChunkMeshCore.SetMeshDataBuffers(
                 ref chunkMeshData,
                 ref vertices,
                 ref triangles,

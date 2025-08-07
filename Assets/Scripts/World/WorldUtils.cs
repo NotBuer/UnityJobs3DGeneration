@@ -49,7 +49,7 @@ namespace World
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Vector2Int GetPositionInChunkCoordinate(
-            in int x, in int z, in byte chunkSize, in NativeArray<ChunkData> chunkDataArray)
+            in float x, in float z, in byte chunkSize, in NativeArray<ChunkData> chunkDataArray)
         {
             foreach (var chunkData in chunkDataArray)
             {   

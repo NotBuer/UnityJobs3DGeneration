@@ -87,7 +87,7 @@ namespace Chunk
             
             _noiseOffset = new float2(offsetX, offsetZ);
         }
-    
+        
         public void Execute(int index)
         {
             var gridOffset = _totalChunksPerAxis / 2;

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Camera;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
@@ -30,16 +31,16 @@ namespace World
         [SerializeField] private float amplitude = 32f;
         [SerializeField] private Material worldDefaultMaterial;
         
-        private bool generatingWorld = false;
+        private bool _generatingWorld = false;
 
         private byte _totalChunksPerAxis;
         private ushort _totalWorldGridDimension;
     
-        private NativeArray<ChunkData> chunkDataArray;
-        private NativeArray<VoxelData> voxelDataArray;
-        private NativeArray<Bounds> chunkBoundsArray;
+        private NativeArray<ChunkData> _chunkDataArray;
+        private NativeArray<VoxelData> _voxelDataArray;
+        private NativeArray<Bounds> _chunkBoundsArray;
 
-        private JobHandle meshesJobsHandle = default;
+        private JobHandle _meshesJobsHandle;
         
         private void OnValidate()
         {
@@ -50,9 +51,9 @@ namespace World
 
         private void OnDrawGizmos()
         {
-            if (generatingWorld) return;
+            if (_generatingWorld || !DebugCamera.Instance) return;
 
-            foreach (var chunk in chunkDataArray)
+            foreach (var chunk in _chunkDataArray)
             {
                 Gizmos.color = Color.red;
                 Gizmos.DrawWireCube(
@@ -92,22 +93,22 @@ namespace World
 
         private void Update()
         {
-            if (!meshesJobsHandle.IsCompleted) return;
+            if (!_meshesJobsHandle.IsCompleted) return;
             
-            meshesJobsHandle.Complete();
-            generatingWorld = false;
+            _meshesJobsHandle.Complete();
+            _generatingWorld = false;
         }
         
         private void PreAllocateBuffers()
         {
-            chunkDataArray = new NativeArray<ChunkData>(
+            _chunkDataArray = new NativeArray<ChunkData>(
                 _totalWorldGridDimension, Allocator.Persistent);
             
-            voxelDataArray = new NativeArray<VoxelData>(
-                chunkDataArray.Length * ChunkUtils.GetChunkTotalSize(chunkSize, chunkSizeY), Allocator.Persistent);
+            _voxelDataArray = new NativeArray<VoxelData>(
+                _chunkDataArray.Length * ChunkUtils.GetChunkTotalSize(chunkSize, chunkSizeY), Allocator.Persistent);
             
-            chunkBoundsArray = new NativeArray<Bounds>(
-                chunkDataArray.Length, Allocator.Persistent);
+            _chunkBoundsArray = new NativeArray<Bounds>(
+                _chunkDataArray.Length, Allocator.Persistent);
         }
 
         #region  HYBRID_JOBS_PIPELINE
@@ -120,8 +121,8 @@ namespace World
                 WorldSeed.Instance.CurrentSeedHashCode,
                 frequency, 
                 amplitude, 
-                chunkDataArray, 
-                voxelDataArray);
+                _chunkDataArray, 
+                _voxelDataArray);
 
             var dataJobHandle = dataJob.Schedule(_totalWorldGridDimension, parallelForInnerLoopBatchCount);
 
@@ -137,12 +138,12 @@ namespace World
                     chunkSize, 
                     chunkSizeY, 
                     _totalChunksPerAxis,
-                    chunkDataArray, 
-                    voxelDataArray,
+                    _chunkDataArray, 
+                    _voxelDataArray,
                     i);
 
                 var meshJobHandle = meshJob.Schedule(dataJobHandle);
-                meshesJobsHandle = JobHandle.CombineDependencies(meshesJobsHandle, meshJobHandle);
+                _meshesJobsHandle = JobHandle.CombineDependencies(_meshesJobsHandle, meshJobHandle);
                 
                 StartCoroutine(
                     WaitForMeshAndRender_HybridJobs(meshJobHandle, meshDataArray, boundsRef, i));
@@ -170,7 +171,7 @@ namespace World
            boundsRef.Dispose();
            
            var chunkGameObject = new GameObject 
-               { name = $"Chunk - X:{chunkDataArray[index].x}, Z:{chunkDataArray[index].z}" };
+               { name = $"Chunk - X:{_chunkDataArray[index].x}, Z:{_chunkDataArray[index].z}" };
            
            var meshFilter = chunkGameObject.AddComponent<MeshFilter>();
            meshFilter.mesh = mesh;
@@ -191,27 +192,27 @@ namespace World
                 WorldSeed.Instance.CurrentSeedHashCode,
                 frequency, 
                 amplitude, 
-                chunkDataArray, 
-                voxelDataArray);
+                _chunkDataArray, 
+                _voxelDataArray);
             
-            var chunkDataJobHandle = chunkDataJob.Schedule(chunkDataArray.Length, parallelForInnerLoopBatchCount);
+            var chunkDataJobHandle = chunkDataJob.Schedule(_chunkDataArray.Length, parallelForInnerLoopBatchCount);
             
-            var chunkMeshDataArray = Mesh.AllocateWritableMeshData(chunkDataArray.Length);
+            var chunkMeshDataArray = Mesh.AllocateWritableMeshData(_chunkDataArray.Length);
     
             var chunkMeshJob = new ChunkMeshJob(
                 chunkMeshDataArray,
-                chunkBoundsArray,
+                _chunkBoundsArray,
                 ChunkUtils.GetChunkTotalSize(chunkSize, chunkSizeY), 
                 chunkSize, 
                 chunkSizeY, 
                 _totalChunksPerAxis,
-                chunkDataArray, 
-                voxelDataArray);
+                _chunkDataArray, 
+                _voxelDataArray);
             
             var chunkMeshJobHandle = chunkMeshJob.Schedule(
                 chunkMeshDataArray.Length, parallelForInnerLoopBatchCount, chunkDataJobHandle);
             
-            meshesJobsHandle = JobHandle.CombineDependencies(meshesJobsHandle, chunkMeshJobHandle);
+            _meshesJobsHandle = JobHandle.CombineDependencies(_meshesJobsHandle, chunkMeshJobHandle);
             
             StartCoroutine(WaitForMeshAndRender_ParallelBatchJobs(
                 JobHandle.CombineDependencies(chunkDataJobHandle, chunkMeshJobHandle), chunkMeshDataArray));
@@ -225,7 +226,7 @@ namespace World
             jobHandle.Complete();
             
             var chunkMeshes = new List<Mesh>(meshDataArray.Length);
-            chunkMeshes.AddRange(chunkDataArray.Select(_ => new Mesh()));
+            chunkMeshes.AddRange(_chunkDataArray.Select(_ => new Mesh()));
             Mesh.ApplyAndDisposeWritableMeshData(meshDataArray, chunkMeshes, 
                 MeshUpdateFlags.DontValidateIndices | 
                 MeshUpdateFlags.DontResetBoneBounds | 
@@ -234,10 +235,10 @@ namespace World
     
             for (byte i = 0; i < chunkMeshes.Count; i++)
             {
-                chunkMeshes[i].bounds = chunkBoundsArray[i];
+                chunkMeshes[i].bounds = _chunkBoundsArray[i];
                 
                 var chunkGameObject = new GameObject 
-                    { name = $"Chunk - X:{chunkDataArray[i].x}, Z:{chunkDataArray[i].z}" };
+                    { name = $"Chunk - X:{_chunkDataArray[i].x}, Z:{_chunkDataArray[i].z}" };
                 
                 var meshFilter = chunkGameObject.AddComponent<MeshFilter>();
                 meshFilter.mesh = chunkMeshes[i];
@@ -253,12 +254,12 @@ namespace World
         
         private void OnWorldGenStart()
         {
-            generatingWorld = true;
+            _generatingWorld = true;
         }
         
         private void OnWorldGenEnd()
         {
-            generatingWorld = false;
+            _generatingWorld = false;
         }
     
         private void OnApplicationQuit()
@@ -270,9 +271,9 @@ namespace World
             StopAllCoroutines();
             Debug.Log($"{nameof(WorldManager)}.{nameof(OnApplicationQuit)} - All coroutines stopped!");
             
-            chunkDataArray.Dispose();
-            voxelDataArray.Dispose();
-            chunkBoundsArray.Dispose();
+            _chunkDataArray.Dispose();
+            _voxelDataArray.Dispose();
+            _chunkBoundsArray.Dispose();
             Debug.Log($"{nameof(WorldManager)}.{nameof(OnApplicationQuit)} - All native containers disposed!");
         }
     }

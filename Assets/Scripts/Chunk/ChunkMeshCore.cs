@@ -9,7 +9,7 @@ using Voxel;
 
 namespace Chunk
 {
-    public static class MeshJobCore
+    public static class ChunkMeshCore
     {
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

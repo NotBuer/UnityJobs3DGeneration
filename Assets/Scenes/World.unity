@@ -215,7 +215,7 @@ MonoBehaviour:
   parallelForInnerLoopBatchCount: 16
   chunkSize: 16
   chunkSizeY: 64
-  renderDistance: 6
+  renderDistance: 2
   frequency: 0.01
   amplitude: 32
   worldDefaultMaterial: {fileID: 2100000, guid: d72454d5a5ad4664aa7e3089a5eee73e, type: 2}
