@@ -1,3 +1,6 @@
+using System;
+using System.Runtime.CompilerServices;
+using Unity.Burst;
 using UnityEngine;
 
 namespace Voxel
@@ -39,16 +42,23 @@ namespace Voxel
             4, 7, 6, 5  // Top Face (Y+)   
         };
         
-        public static readonly Color32 GrassColor = new Color32(120, 200, 100, 255);
-        public static readonly Color32 DirtColor = new Color32(139, 69, 19, 255);
-        public static readonly Color32 StoneColor = new Color32(150, 150, 150, 255);
-
-        // public static readonly Vector2[] Uvs = new Vector2[4]
-        // {
-        //     new(0.0f, 0.0f), // Bottom-left
-        //     new(1.0f, 0.0f), // Bottom-right
-        //     new(1.0f, 1.0f), // Top-right
-        //     new(0.0f, 1.0f), // Top-left
-        // };
+        private static readonly Color32 GrassColor = new(120, 200, 100, 255);
+        private static readonly Color32 DirtColor = new(139, 69, 19, 255);
+        private static readonly Color32 StoneColor = new(150, 150, 150, 255);
+        
+        [BurstCompile]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Color32 GetVoxelColor(
+            in VoxelType voxelType)
+        {
+            return voxelType switch
+            {
+                VoxelType.Grass => VoxelUtils.GrassColor,
+                VoxelType.Dirt => VoxelUtils.DirtColor,
+                VoxelType.Stone => VoxelUtils.StoneColor,
+                
+                _ => throw new ArgumentOutOfRangeException(nameof(voxelType), voxelType, null)
+            };
+        }
     }
 }

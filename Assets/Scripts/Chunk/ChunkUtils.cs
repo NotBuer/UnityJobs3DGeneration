@@ -1,9 +1,11 @@
 using System.Runtime.CompilerServices;
+using Unity.Burst;
 
 namespace Chunk
 {
     public static class ChunkUtils
     {
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int GetChunkTotalSize(in byte chunkSize, in byte chunkSizeY) =>
             chunkSize * chunkSize * chunkSizeY;
@@ -18,6 +20,7 @@ namespace Chunk
         /// <param name="chunkSize">The size (length and width) of the chunk in number of voxels.</param>
         /// <param name="chunkSizeY">The height of the chunk in number of voxels.</param>
         /// <returns>A single integer representing the 1D index of the voxel within the chunk's linear array.</returns>
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Flatten3DLocalCoordsToIndex(
             int voxelIndex, int voxelX, int voxelY, int voxelZ, int chunkSize, int chunkSizeY) 
@@ -33,6 +36,7 @@ namespace Chunk
         /// <param name="chunkSize">The size (length and width) of the chunk in number of voxels.</param>
         /// <param name="chunkSizeY">The height of the chunk in number of voxels.</param>
         /// <returns>A tuple containing the X, Y, and Z local coordinates of the voxel within the chunk.</returns>
+        [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static (int x, int y, int z) UnflattenIndexTo3DLocalCoords(
             int localVoxelIndex, int chunkSize, int chunkSizeY)

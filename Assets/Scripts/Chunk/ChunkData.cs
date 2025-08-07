@@ -7,10 +7,10 @@ namespace Chunk
     [StructLayout(LayoutKind.Sequential)]
     public struct ChunkData : IEquatable<ChunkData>
     {
-        public float x;
-        public float z;
+        public int x;
+        public int z;
 
-        public ChunkData(float x, float z)
+        public ChunkData(int x, int z)
         {
             this.x = x;
             this.z = z;

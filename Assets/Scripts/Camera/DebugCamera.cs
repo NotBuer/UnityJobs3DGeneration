@@ -5,6 +5,8 @@ namespace Camera
 {
     public class DebugCamera : MonoBehaviour
     {
+		public static DebugCamera Instance { get; private set; }
+
         [Range(1f, 100f)] [SerializeField] private float movementSpeed = 25f;
         [Range(1f, 100f)] [SerializeField] private float mouseSpeed = 25f;
         [SerializeField] private bool showCursor = true;
@@ -18,6 +20,12 @@ namespace Camera
         private float mouseY;
 
         private bool focused;
+
+        private void Awake()
+        {
+            if (Instance == null) Instance = this;
+            else DestroyImmediate(gameObject);
+        }
 
         private void Start()
         {

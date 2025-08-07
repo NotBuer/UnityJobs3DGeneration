@@ -38,6 +38,8 @@ namespace World
         private NativeArray<ChunkData> chunkDataArray;
         private NativeArray<VoxelData> voxelDataArray;
         private NativeArray<Bounds> chunkBoundsArray;
+
+        private JobHandle meshesJobsHandle = default;
         
         private void OnValidate()
         {
@@ -49,16 +51,13 @@ namespace World
         private void OnDrawGizmos()
         {
             if (generatingWorld) return;
-            
-            for (var i = 0; i < chunkDataArray.Length; i++)
+
+            foreach (var chunk in chunkDataArray)
             {
-                var chunk = chunkDataArray[i];
-                var chunkBounds = chunkBoundsArray[i];
-                
                 Gizmos.color = Color.red;
                 Gizmos.DrawWireCube(
                     new Vector3(chunk.x + (float)chunkSize / 2, 0f, chunk.z + (float)chunkSize / 2),
-                    new Vector3(chunkSize, chunkBounds.size.y, chunkSize));
+                    new Vector3(chunkSize, 0f, chunkSize));
             }
         }
 
@@ -89,6 +88,14 @@ namespace World
                 Debug.Log("World generation pipeline -> Batched ('IJobParallelFor') jobs.");
                 SetupJobsAndScheduling_ParallelBatchJobs();
             }
+        }
+
+        private void Update()
+        {
+            if (!meshesJobsHandle.IsCompleted) return;
+            
+            meshesJobsHandle.Complete();
+            generatingWorld = false;
         }
         
         private void PreAllocateBuffers()
@@ -135,12 +142,11 @@ namespace World
                     i);
 
                 var meshJobHandle = meshJob.Schedule(dataJobHandle);
+                meshesJobsHandle = JobHandle.CombineDependencies(meshesJobsHandle, meshJobHandle);
                 
                 StartCoroutine(
                     WaitForMeshAndRender_HybridJobs(meshJobHandle, meshDataArray, boundsRef, i));
             }
-            
-            _onWorldGenEnd.Invoke();
         }
 
         private IEnumerator WaitForMeshAndRender_HybridJobs(
@@ -205,6 +211,8 @@ namespace World
             var chunkMeshJobHandle = chunkMeshJob.Schedule(
                 chunkMeshDataArray.Length, parallelForInnerLoopBatchCount, chunkDataJobHandle);
             
+            meshesJobsHandle = JobHandle.CombineDependencies(meshesJobsHandle, chunkMeshJobHandle);
+            
             StartCoroutine(WaitForMeshAndRender_ParallelBatchJobs(
                 JobHandle.CombineDependencies(chunkDataJobHandle, chunkMeshJobHandle), chunkMeshDataArray));
         }
@@ -240,8 +248,6 @@ namespace World
 
                 yield return null;
             }
-            
-            _onWorldGenEnd.Invoke();
         }
         #endregion
         
