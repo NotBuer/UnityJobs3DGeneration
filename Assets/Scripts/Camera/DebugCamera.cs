@@ -29,6 +29,7 @@ namespace Camera
 
         private void Start()
         {
+            transform.position = new Vector3(8f, 16f, 8f);
             _transform = gameObject.transform;
             _moveAction = InputSystem.actions.FindAction("Move");
             _lookAction = InputSystem.actions.FindAction("Look");

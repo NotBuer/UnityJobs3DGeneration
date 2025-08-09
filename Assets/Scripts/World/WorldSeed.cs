@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -13,7 +14,7 @@ namespace World
     
         [SerializeField] private string currentSeed;
         [SerializeField] private bool generateRandomSeed;
-
+        
         public ulong CurrentSeedHashCode { get; private set; }
 
         private void Awake()

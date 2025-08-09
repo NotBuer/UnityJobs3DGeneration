@@ -37,31 +37,29 @@ namespace World
             => (ushort)(z * totalChunksPerAxis + x);
 
         /// <summary>
-        /// Retrieves the bottom-left corner position of the chunk containing the given coordinates (x, z).
-        /// Iterates through the provided chunk data to find the chunk whose bounds include the specified position.
+        /// Calculates the chunk coordinates (x, z) in the world grid from a given world position.
+        /// The coordinates are determined by dividing the world position by the chunk size and flooring the result
+        /// to ensure the values correspond to the lower bounds (bottom-left snapping) of the chunk the position belongs to.
         /// </summary>
-        /// <param name="x">The x-coordinate of the position to locate.</param>
-        /// <param name="z">The z-coordinate of the position to locate.</param>
+        /// <param name="worldPosition">The 3D position in the world space.</param>
         /// <param name="chunkSize">The size of each chunk along one axis.</param>
-        /// <param name="chunkDataArray">A native array containing data about all chunks in the grid.</param>
-        /// <returns>A Vector2Int representing the bottom-left corner coordinates of the chunk that contains the specified position.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when the given position does not fall within any chunk.</exception>
+        /// <returns>A Vector2Int representing the chunk coordinates (x, z) in the grid.</returns>
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector2Int GetPositionInChunkCoordinate(
-            in float x, in float z, in byte chunkSize, in NativeArray<ChunkData> chunkDataArray)
-        {
-            foreach (var chunkData in chunkDataArray)
-            {   
-                // Check if is inside from the chunk Bottom-Left to Top-Right bounding box.
-                if (x >= chunkData.x && x <= chunkData.x + chunkSize &&
-                    z >= chunkData.z && z <= chunkData.z + chunkSize)
-                {
-                    return new Vector2Int(chunkData.x, chunkData.z);
-                }
-            }
-            throw new InvalidOperationException(
-                $"{nameof(WorldUtils)}.{nameof(GetPositionInChunkCoordinate)} - Position couldn't be found in any chunk!!!");
-        }
+        public static Vector2Int GetChunkCoordinateFromWorldPosition(Vector3 worldPosition, in byte chunkSize)
+            => new(
+                x: Mathf.FloorToInt(worldPosition.x / chunkSize) * chunkSize,
+                y: Mathf.FloorToInt(worldPosition.z / chunkSize) * chunkSize);
+
+        /// <summary>
+        /// Converts a grid position into the corresponding chunk position by scaling the grid coordinates using the chunk size.
+        /// </summary>
+        /// <param name="gridPosition">The grid position represented as a 2D vector (x, y).</param>
+        /// <param name="chunkSize">The size of each chunk along one axis in grid units.</param>
+        /// <returns>A 2D vector representing the chunk position corresponding to the given grid position.</returns>
+        [BurstCompile]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Vector2Int GetGridPositionAsChunkPosition(Vector2Int gridPosition, in byte chunkSize)
+            => new(x: gridPosition.x * chunkSize, y: gridPosition.y * chunkSize);
     }
 }

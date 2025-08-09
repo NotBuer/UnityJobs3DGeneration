@@ -9,78 +9,80 @@ namespace Chunk
     [BurstCompile]
     public unsafe struct ChunkMeshJob : IJobParallelFor
     {
-        private Mesh.MeshDataArray _chunkMeshDataArray;
-        [WriteOnly] private NativeArray<Bounds> _chunkBoundsArray;
-        [ReadOnly] private readonly int _chunkVoxelCount;
+        [ReadOnly] private readonly int _chunkSizeInVoxels;
         [ReadOnly] private readonly byte _chunkSize;
         [ReadOnly] private readonly byte _chunkSizeY;
-        [ReadOnly] private readonly byte _totalChunksPerAxis;
-        [ReadOnly] private readonly NativeArray<ChunkData> _chunkDataArray;
-        [ReadOnly] private readonly NativeArray<VoxelData> _voxelDataArray;
-    
+        
+        [ReadOnly, NativeDisableParallelForRestriction] 
+        private readonly NativeArray<Vector2Int> _chunkCoordsArray;
+        
+        [ReadOnly, NativeDisableParallelForRestriction] 
+        private NativeArray<VoxelData> _voxelDataArray;
+        
+        [NativeDisableParallelForRestriction] 
+        private readonly NativeParallelHashMap<Vector2Int, int>.ReadOnly _coordTableHashMap;
+        
+        [NativeDisableParallelForRestriction] private Mesh.MeshDataArray _chunkMeshDataArray;
+        [WriteOnly, NativeDisableParallelForRestriction] private NativeArray<Bounds> _chunkBoundsArray;
+
         public ChunkMeshJob(
-            Mesh.MeshDataArray chunkMeshDataArray, 
-            NativeArray<Bounds> chunkBoundsArray,
-            int chunkVoxelCount,
-            byte chunkSize,
+            int chunkSizeInVoxels,
+            byte chunkSize, 
             byte chunkSizeY,
-            byte totalChunksPerAxis,
-            NativeArray<ChunkData> chunkDataArray, 
-            NativeArray<VoxelData> voxelDataArray)
+            NativeArray<Vector2Int> chunkCoordsArray,
+            NativeArray<VoxelData> voxelDataArray,
+            NativeParallelHashMap<Vector2Int, int>.ReadOnly coordTableHashMap,
+            Mesh.MeshDataArray chunkMeshDataArray,
+            NativeArray<Bounds> chunkBoundsArray) : this()
         {
-            _chunkMeshDataArray = chunkMeshDataArray;
-            _chunkBoundsArray = chunkBoundsArray;
-            _chunkVoxelCount = chunkVoxelCount;
+            _chunkSizeInVoxels = chunkSizeInVoxels;
             _chunkSize = chunkSize;
             _chunkSizeY = chunkSizeY;
-            _totalChunksPerAxis = totalChunksPerAxis;
-            _chunkDataArray = chunkDataArray;
+            _chunkCoordsArray = chunkCoordsArray;
             _voxelDataArray = voxelDataArray;
+            _coordTableHashMap = coordTableHashMap;
+            _chunkMeshDataArray = chunkMeshDataArray;
+            _chunkBoundsArray = chunkBoundsArray;
         }
         
         public void Execute(int index)
         {
-            var chunkMeshData = _chunkMeshDataArray[index];
+            var chunkCoord = _chunkCoordsArray[index];
             
-            var voxelStartIndex = _chunkVoxelCount * index;
-            
-            var currentChunkWorldX = _chunkDataArray[index].x;
-            var currentChunkWorldZ = _chunkDataArray[index].z;
-
-            var boundsMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-            var boundsMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            var voxelDataLocalViewArray = _voxelDataArray.GetSubArray(index * _chunkSizeInVoxels, _chunkSizeInVoxels); 
 
             var visibleFaces = 0;
             
-            ChunkMeshCore.FirstPassGetVisibleFacesLocal(
-                in _chunkVoxelCount,
+            ChunkMeshCore.FirstPassGetVisibleFaces(
+                in _chunkSizeInVoxels,
                 in _voxelDataArray,
+                in voxelDataLocalViewArray,
+                in chunkCoord,
                 in _chunkSize,
                 in _chunkSizeY,
-                in _totalChunksPerAxis,
-                in voxelStartIndex,
-                in currentChunkWorldX,
-                in currentChunkWorldZ,
                 ref visibleFaces,
-                true);
+                in _coordTableHashMap);
             
-            ChunkMeshCore.SecondPassGetVisibleFacesGlobal(
-                in _chunkVoxelCount,
+            var boundsMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            var boundsMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            
+            ChunkMeshCore.SecondPassBuildMeshData(
+                in _chunkSizeInVoxels,
                 in _voxelDataArray,
+                in voxelDataLocalViewArray,
+                in chunkCoord,
                 in _chunkSize,
                 in _chunkSizeY,
-                in _totalChunksPerAxis,
                 in visibleFaces,
-                in voxelStartIndex,
                 out var vertices,
                 out var triangles,
                 out var normals,
                 out var colors,
-                in currentChunkWorldX,
-                in currentChunkWorldZ,
-                false,
                 ref boundsMin,
-                ref boundsMax);
+                ref boundsMax,
+                in _coordTableHashMap);
+            
+            var chunkMeshData = _chunkMeshDataArray[index];
             
             ChunkMeshCore.SetMeshDataBuffers(
                 ref chunkMeshData,

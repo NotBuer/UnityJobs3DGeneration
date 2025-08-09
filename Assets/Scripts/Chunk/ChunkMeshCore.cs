@@ -13,78 +13,68 @@ namespace Chunk
     {
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void FirstPassGetVisibleFacesLocal(
-            in int chunkVoxelCount,
+        public static void FirstPassGetVisibleFaces(
+            in int chunkSizeInVoxels,
             in NativeArray<VoxelData> voxelDataArray,
+            in NativeArray<VoxelData> voxelDataLocalViewArray,
+            in Vector2Int chunkCoord,
             in byte chunkSize,
             in byte chunkSizeY,
-            in byte totalChunksPerAxis,
-            in int voxelStartIndex,
-            in int currentChunkWorldX,
-            in int currentChunkWorldZ,
             ref int visibleFaces, 
-            in bool firstPass)
+            in NativeParallelHashMap<Vector2Int, int>.ReadOnly coordTableHashMap)
         {
-            for (var voxelIndex = 0; voxelIndex < chunkVoxelCount; voxelIndex++)
+            for (var voxelIndex = 0; voxelIndex < chunkSizeInVoxels; voxelIndex++)
             {
-                if (voxelDataArray[voxelStartIndex + voxelIndex].type == VoxelType.Air)
+                if (voxelDataLocalViewArray[voxelIndex].type == VoxelType.Air)
                     continue;
         
                 for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
                 {
-                    var normal = VoxelUtils.Normals[faceIndex];
-                    
-                    if (!IsFaceVisible(
+                    if (IsFaceVisible(
+                            in chunkSizeInVoxels,
                             in chunkSize,
                             in chunkSizeY,
                             in voxelDataArray,
-                            in totalChunksPerAxis,
-                            in chunkVoxelCount,
-                            in currentChunkWorldX,
-                            in currentChunkWorldZ,
+                            in voxelDataLocalViewArray,
+                            in chunkCoord,
                             in voxelIndex,
-                            in normal,
-                            in voxelStartIndex,
-                            in firstPass)) continue;
-                    
-                    visibleFaces++;
+                            in VoxelUtils.Normals[faceIndex],
+                            in coordTableHashMap))
+                    {
+                        visibleFaces++;   
+                    }
                 }
             }
         }
 
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe void SecondPassGetVisibleFacesGlobal(
-            in int chunkVoxelCount,
+        public static unsafe void SecondPassBuildMeshData(
+            in int chunkSizeInVoxels,
             in NativeArray<VoxelData> voxelDataArray,
+            in NativeArray<VoxelData> voxelDataLocalViewArray,
+            in Vector2Int chunkCoord,
             in byte chunkSize,
             in byte chunkSizeY,
-            in byte totalChunksPerAxis,
             in int visibleFaces,
-            in int voxelStartIndex,
             out UnsafeList<Vector3>* vertices,
             out UnsafeList<int>* triangles,
             out UnsafeList<Vector3>* normals,
             out UnsafeList<Color32>* colors,
-            in int currentChunkWorldX,
-            in int currentChunkWorldZ,
-            in bool firstPass,
             ref Vector3 boundsMin,
-            ref Vector3 boundsMax)
+            ref Vector3 boundsMax,
+            in NativeParallelHashMap<Vector2Int, int>.ReadOnly coordTableHashMap)
         {
-            var bufferVertexCount = Mathf.FloorToInt(visibleFaces * 1.3125f * VoxelUtils.FaceEdges);
-            var bufferTriangleCount = Mathf.FloorToInt(visibleFaces * 1.3125f * VoxelUtils.FaceCount);
-            
-            vertices = UnsafeList<Vector3>.Create(bufferVertexCount, Allocator.Temp);
-            triangles = UnsafeList<int>.Create(bufferTriangleCount, Allocator.Temp);
-            normals = UnsafeList<Vector3>.Create(bufferVertexCount, Allocator.Temp);
-            colors = UnsafeList<Color32>.Create(bufferVertexCount, Allocator.Temp);
+            vertices = UnsafeList<Vector3>.Create(visibleFaces * VoxelUtils.FaceEdges, Allocator.Temp);
+            triangles = UnsafeList<int>.Create(visibleFaces * VoxelUtils.FaceCount, Allocator.Temp);
+            normals = UnsafeList<Vector3>.Create(visibleFaces * VoxelUtils.FaceEdges, Allocator.Temp);
+            colors = UnsafeList<Color32>.Create(visibleFaces * VoxelUtils.FaceEdges, Allocator.Temp);
 
             var vertexIndex = 0;
             
-            for (var voxelIndex = 0; voxelIndex < chunkVoxelCount; voxelIndex++)
+            for (var voxelIndex = 0; voxelIndex < chunkSizeInVoxels; voxelIndex++)
             {
-                var voxelType = voxelDataArray[voxelStartIndex + voxelIndex].type;
+                var voxelType = voxelDataLocalViewArray[voxelIndex].type;
                 
                 if (voxelType == VoxelType.Air)
                     continue;
@@ -92,26 +82,22 @@ namespace Chunk
                 var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, chunkSize, chunkSizeY);
                 
                 var voxelPosition = new Vector3(
-                    x + currentChunkWorldX,
+                    x + chunkCoord.x,
                     y,
-                    z + currentChunkWorldZ);
+                    z + chunkCoord.y);
         
                 for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
                 {
-                    var normal = VoxelUtils.Normals[faceIndex];
-                    
                     if (!IsFaceVisible(
+                            in chunkSizeInVoxels,
                             in chunkSize,
                             in chunkSizeY,
                             in voxelDataArray,
-                            in totalChunksPerAxis,
-                            in chunkVoxelCount,
-                            in currentChunkWorldX,
-                            in currentChunkWorldZ,
+                            in voxelDataLocalViewArray,
+                            in chunkCoord,
                             in voxelIndex,
-                            in normal,
-                            in voxelStartIndex,
-                            in firstPass)) continue;
+                            in VoxelUtils.Normals[faceIndex],
+                            in coordTableHashMap)) continue;
         
                     for (byte j = 0; j < VoxelUtils.FaceEdges; j++)
                     {
@@ -120,7 +106,7 @@ namespace Chunk
                             VoxelUtils.Vertices[VoxelUtils.FaceVertices[faceIndex * VoxelUtils.FaceEdges + j]];
                         
                         vertices->AddNoResize(vertex);
-                        normals->AddNoResize(normal);
+                        normals->AddNoResize(VoxelUtils.Normals[faceIndex]);
                         colors->AddNoResize(VoxelUtils.GetVoxelColor(in voxelType));
                         
                         boundsMin = Vector3.Min(boundsMin, vertex);
@@ -143,23 +129,20 @@ namespace Chunk
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static bool IsFaceVisible(
+            in int chunkSizeInVoxels, 
             in byte chunkSize,
             in byte chunkSizeY,
             in NativeArray<VoxelData> voxelDataArray,
-            in byte totalChunksPerAxis,
-            in int chunkVoxelCount,
-            in int currentChunkWorldX,
-            in int currentChunkWorldZ,
+            in NativeArray<VoxelData> voxelDataChunkViewArray,
+            in Vector2Int chunkCoord,
             in int voxelIndex,
             in Vector3Int normal,
-            in int voxelStartIndex,
-            in bool firstPass)
+            in NativeParallelHashMap<Vector2Int, int>.ReadOnly coordTableHashMap)
         {
             var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, chunkSize, chunkSizeY);
         
             var neighborY = y + normal.y;
-            if (neighborY < 0 || neighborY >= chunkSizeY)
-                return true;
+            if (neighborY < 0 || neighborY >= chunkSizeY) return true;
             
             var neighborX = x + normal.x;
             var neighborZ = z + normal.z;
@@ -167,43 +150,29 @@ namespace Chunk
             // Neighbor voxel is within the current chunk's local XZ bounds
             if (neighborX >= 0 && neighborX < chunkSize && neighborZ >= 0 && neighborZ < chunkSize)
             {
-                var neighborVoxelIndex = voxelStartIndex +
+                var neighborVoxelIndex =
                     ChunkUtils.Flatten3DLocalCoordsToIndex(
                         0, neighborX, neighborY, neighborZ, chunkSize, chunkSizeY);
                 
-                return voxelDataArray[neighborVoxelIndex].type == VoxelType.Air;
+                return voxelDataChunkViewArray[neighborVoxelIndex].type == VoxelType.Air;
             }
             
-            if (firstPass) return false;
+            var neighborWorldPos = new Vector2Int(chunkCoord.x + neighborX, chunkCoord.y + neighborZ);
+            var neighborChunkCoord = new Vector2Int(
+                Mathf.FloorToInt((float)neighborWorldPos.x / chunkSize) * chunkSize,
+                Mathf.FloorToInt((float)neighborWorldPos.y / chunkSize) * chunkSize);
             
-            // Neighbor might be in an adjacent chunk.
-            var neighborGlobalX = currentChunkWorldX + neighborX;
-            var neighborGlobalZ = currentChunkWorldZ + neighborZ;
+            // Look up the neighbor chunk's voxel data in the coord table.
+            if (!coordTableHashMap.TryGetValue(neighborChunkCoord, out var neighborChunkIndex)) return true;
             
-            // Calculate target chunk grid coordinates.
-            var gridOffset = totalChunksPerAxis / 2;
-            var targetChunkGridX = Mathf.FloorToInt((float)neighborGlobalX / chunkSize) + gridOffset;
-            var targetChunkGridZ = Mathf.FloorToInt((float)neighborGlobalZ / chunkSize) + gridOffset;
+            // Calculate the voxel's local coordinates within its own chunk.
+            var targetVoxelLocalX = (neighborWorldPos.x % chunkSize + chunkSize) % chunkSize;
+            var targetVoxelLocalZ = (neighborWorldPos.y % chunkSize + chunkSize) % chunkSize;
             
-            // Ensure the target chunk is within world bounds.
-            if (targetChunkGridX < 0 || targetChunkGridX >= totalChunksPerAxis ||
-                targetChunkGridZ < 0 || targetChunkGridZ >= totalChunksPerAxis)
-                return false;   
-            
-            // Calculate the target chunk's array index.
-            var targetChunkIndex = targetChunkGridZ * totalChunksPerAxis + targetChunkGridX;
-            
-            var targetVoxelLocalX = (neighborGlobalX % chunkSize + chunkSize) % chunkSize;
-            var targetVoxelLocalZ = (neighborGlobalZ % chunkSize + chunkSize) % chunkSize;
-            
-            var neighborAbsoluteIndex = (targetChunkIndex * chunkVoxelCount) + ChunkUtils.Flatten3DLocalCoordsToIndex(
+            var neighborGlobalIndex = (neighborChunkIndex * chunkSizeInVoxels) + ChunkUtils.Flatten3DLocalCoordsToIndex(
                 0, targetVoxelLocalX, neighborY, targetVoxelLocalZ, chunkSize, chunkSizeY);
-            
-            // Validate and check voxel visibility.
-            return 
-                neighborAbsoluteIndex >= 0 && 
-                neighborAbsoluteIndex < voxelDataArray.Length &&
-                voxelDataArray[neighborAbsoluteIndex].type == VoxelType.Air;
+                
+            return voxelDataArray[neighborGlobalIndex].type == VoxelType.Air;
         }
         
         [BurstCompile]

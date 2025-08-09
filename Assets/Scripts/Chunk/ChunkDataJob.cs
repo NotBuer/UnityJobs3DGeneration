@@ -4,42 +4,48 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 using Voxel;
-using World;
 
 namespace Chunk
 { 
     [BurstCompile]
     public struct ChunkDataJob : IJobParallelFor
     {
-        [ReadOnly] private readonly byte _totalChunksPerAxis;
+        [ReadOnly] private readonly int _chunkSizeInVoxels;
         [ReadOnly] private readonly byte _chunkSize;
         [ReadOnly] private readonly byte _chunkSizeY;
         [ReadOnly] private readonly ulong _seed;
     	[ReadOnly] private readonly float _frequency;
     	[ReadOnly] private readonly float _amplitude;
-        [WriteOnly] private NativeArray<ChunkData> _chunkDataArray;
-        [WriteOnly, NativeDisableParallelForRestriction] private NativeArray<VoxelData> _voxelDataArray;
+        
+        [ReadOnly] private NativeArray<Vector2Int> _chunkCoordsArray;
+        
+        [WriteOnly] [NativeDisableParallelForRestriction] 
+        private NativeArray<VoxelData> _voxelDataArray;
+        
+        private NativeParallelHashMap<Vector2Int, int>.ParallelWriter _coordTableHashMap;
 
         private readonly float2 _noiseOffset;
     
         public ChunkDataJob(
-            byte totalChunksPerAxis,
+            int chunkSizeInVoxels,
             byte chunkSize, 
             byte chunkSizeY,
             ulong seed,
             float frequency,
             float amplitude,
-            NativeArray<ChunkData> chunkDataArray, 
-            NativeArray<VoxelData> voxelDataArray) : this()
+            NativeArray<Vector2Int> chunkCoordsArray,
+            NativeArray<VoxelData> voxelDataArray,
+            NativeParallelHashMap<Vector2Int, int>.ParallelWriter coordTableHashMap) : this()
         {
-            _totalChunksPerAxis = totalChunksPerAxis;
+            _chunkSizeInVoxels = chunkSizeInVoxels;
             _chunkSize = chunkSize;
             _chunkSizeY = chunkSizeY;
             _seed = seed;
             _frequency = frequency;
             _amplitude = amplitude;
-            _chunkDataArray = chunkDataArray;
+            _chunkCoordsArray = chunkCoordsArray;
             _voxelDataArray = voxelDataArray;
+            _coordTableHashMap = coordTableHashMap;
             
             // 0xFFFFFFFF = uint.MaxValue(4294967295)
             // 0xFFFF = ushort.MaxValue(65535)
@@ -90,30 +96,17 @@ namespace Chunk
         
         public void Execute(int index)
         {
-            var gridOffset = _totalChunksPerAxis / 2;
-            var (chunkX, chunkZ) = WorldUtils.UnflattenIndexToGrid((ushort)index, in _totalChunksPerAxis);
-            chunkX -= gridOffset;
-            chunkZ -= gridOffset;
+            var chunkCoord = _chunkCoordsArray[index];
+            _coordTableHashMap.TryAdd(chunkCoord, index);
             
-            var currentChunkX = chunkX * _chunkSize;
-            var currentChunkZ = chunkZ * _chunkSize;
-    
-            _chunkDataArray[index] = new ChunkData(currentChunkX, currentChunkZ);
-    
-            var chunkVoxelStartIndex = index * (_chunkSize * _chunkSize * _chunkSizeY);
-
-            // TODO: Try use this to place vegetation, ores, etc...
-            // var random = 
-            //     new Unity.Mathematics.Random((uint)(_seed ^ (currentChunkX * 397) ^ (currentChunkZ * 397)));
-            
-            for (byte voxelX = 0; voxelX < _chunkSize; voxelX++)
+            for (byte x = 0; x < _chunkSize; x++)
             {
-                for (byte voxelZ = 0; voxelZ < _chunkSize; voxelZ++)
+                for (byte z = 0; z < _chunkSize; z++)
                 {
                     var noiseValue = noise.snoise(
                         new float2(
-                            (currentChunkX + voxelX) * _frequency + _noiseOffset.x,
-                            (currentChunkZ + voxelZ) * _frequency + _noiseOffset.y
+                            (chunkCoord.x + x) * _frequency + _noiseOffset.x,
+                            (chunkCoord.y + z) * _frequency + _noiseOffset.y
                         )
                     );
                     
@@ -122,18 +115,18 @@ namespace Chunk
                     
                     var height = Mathf.RoundToInt(noiseValue * _amplitude);
     
-                    for (byte voxelY = 0; voxelY < _chunkSizeY; voxelY++)
+                    for (byte y = 0; y < _chunkSizeY; y++)
                     {
-                        var voxelType = voxelY switch
+                        var voxelType = y switch
                         {
-                            _ when voxelY >= height - 2 && voxelY <= height     => VoxelType.Grass,
-                            _ when voxelY >= height - 4 && voxelY <= height - 2 => VoxelType.Dirt,
-                            _ when voxelY >= height - 6 && voxelY <= height - 4 => VoxelType.Stone,
+                            _ when y >= height - 2 && y <= height     => VoxelType.Grass,
+                            _ when y >= height - 4 && y <= height - 2 => VoxelType.Dirt,
+                            _ when y >= height - 6 && y <= height - 4 => VoxelType.Stone,
                             _ => VoxelType.Air
                         };
     
                         _voxelDataArray[ChunkUtils.Flatten3DLocalCoordsToIndex(
-                            chunkVoxelStartIndex, voxelX, voxelY, voxelZ, _chunkSize, _chunkSizeY)] = new VoxelData(voxelType);
+                            index * _chunkSizeInVoxels, x, y, z, _chunkSize, _chunkSizeY)] = new VoxelData(voxelType);
                     }
                 }
             }

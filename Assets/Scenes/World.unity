@@ -134,7 +134,7 @@ GameObject:
   m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &75973637
 Transform:
   m_ObjectHideFlags: 0
@@ -165,7 +165,7 @@ GameObject:
   m_Icon: {fileID: -5487077368411116049, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &99970673
 Transform:
   m_ObjectHideFlags: 0
@@ -211,11 +211,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0f0d27f3a63207e4ea215fae2f062134, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useHybridJobs: 1
-  parallelForInnerLoopBatchCount: 16
+  innerLoopBatchCount: 8
   chunkSize: 16
   chunkSizeY: 64
-  renderDistance: 2
+  renderDistance: 4
   frequency: 0.01
   amplitude: 32
   worldDefaultMaterial: {fileID: 2100000, guid: d72454d5a5ad4664aa7e3089a5eee73e, type: 2}
@@ -537,7 +536,7 @@ GameObject:
   m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &644590119
 Transform:
   m_ObjectHideFlags: 0
@@ -568,7 +567,7 @@ GameObject:
   m_Icon: {fileID: -5487077368411116049, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &831546455
 Transform:
   m_ObjectHideFlags: 0
@@ -648,7 +647,7 @@ GameObject:
   m_Icon: {fileID: -5487077368411116049, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1406320125
 Transform:
   m_ObjectHideFlags: 0
@@ -679,7 +678,7 @@ GameObject:
   m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1992071778
 Transform:
   m_ObjectHideFlags: 0
@@ -710,7 +709,7 @@ GameObject:
   m_Icon: {fileID: 7174288486110832750, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2085672845
 Transform:
   m_ObjectHideFlags: 0
@@ -741,7 +740,7 @@ GameObject:
   m_Icon: {fileID: -5487077368411116049, guid: 0000000000000000d000000000000000, type: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2113366619
 Transform:
   m_ObjectHideFlags: 0
