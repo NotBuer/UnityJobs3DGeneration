@@ -1,10 +1,12 @@
 using System;
 using System.Runtime.CompilerServices;
 using Unity.Burst;
+using Unity.Mathematics;
 using UnityEngine;
 
 namespace Voxel
 {
+    [BurstCompile]
     public static class VoxelUtils
     {
         public const byte FaceCount = 6;
@@ -23,6 +25,16 @@ namespace Voxel
         };
 
         public static readonly Vector3Int[] Normals = new Vector3Int[6]
+        {
+            new( 0,  0, -1), // Front Face
+            new( 0,  0,  1), // Back Face
+            new(-1,  0,  0), // Left Face
+            new( 1,  0,  0), // Right Face
+            new( 0, -1,  0), // Bottom Face
+            new( 0,  1,  0)  // Top Face
+        };
+        
+        public static readonly int3[] NormalsInt3 = new int3[6]
         {
             new( 0,  0, -1), // Front Face
             new( 0,  0,  1), // Back Face
@@ -53,9 +65,9 @@ namespace Voxel
         {
             return voxelType switch
             {
-                VoxelType.Grass => VoxelUtils.GrassColor,
-                VoxelType.Dirt => VoxelUtils.DirtColor,
-                VoxelType.Stone => VoxelUtils.StoneColor,
+                VoxelType.Grass => GrassColor,
+                VoxelType.Dirt => DirtColor,
+                VoxelType.Stone => StoneColor,
                 
                 _ => throw new ArgumentOutOfRangeException(nameof(voxelType), voxelType, null)
             };

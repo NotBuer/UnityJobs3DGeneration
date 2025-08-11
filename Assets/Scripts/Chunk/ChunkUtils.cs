@@ -3,6 +3,7 @@ using Unity.Burst;
 
 namespace Chunk
 {
+    [BurstCompile]
     public static class ChunkUtils
     {
         [BurstCompile]
@@ -28,22 +29,25 @@ namespace Chunk
                (voxelX * chunkSize * chunkSizeY) +
                (voxelZ * chunkSizeY) + 
                voxelY;
-    
+
         /// <summary>
-        /// Converts a 1D index within a chunk into its corresponding 3D local coordinates.
+        /// Converts a 1D local voxel index to 3D local coordinates within a chunk.
         /// </summary>
-        /// <param name="localVoxelIndex">The 1D index of the voxel within the chunk's linear array.</param>
+        /// <param name="localVoxelIndex">The 1D index of the voxel in the chunk.</param>
         /// <param name="chunkSize">The size (length and width) of the chunk in number of voxels.</param>
         /// <param name="chunkSizeY">The height of the chunk in number of voxels.</param>
-        /// <returns>A tuple containing the X, Y, and Z local coordinates of the voxel within the chunk.</returns>
+        /// <param name="x">The X-coordinate of the voxel within the chunk, returned by this method.</param>
+        /// <param name="y">The Y-coordinate of the voxel within the chunk, returned by this method.</param>
+        /// <param name="z">The Z-coordinate of the voxel within the chunk, returned by this method.</param>
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static (int x, int y, int z) UnflattenIndexTo3DLocalCoords(
-            int localVoxelIndex, int chunkSize, int chunkSizeY)
-            => (
-                localVoxelIndex / (chunkSize * chunkSizeY),
-                localVoxelIndex % chunkSizeY,
-                (localVoxelIndex / chunkSizeY) % chunkSize 
-            );
+        public static void UnflattenIndexTo3DLocalCoords(
+            int localVoxelIndex, int chunkSize, int chunkSizeY,
+            out int x, out int y, out int z)
+        {
+            x = localVoxelIndex / (chunkSize * chunkSizeY);
+            y = localVoxelIndex % chunkSizeY;
+            z = (localVoxelIndex / chunkSizeY) % chunkSize;
+        }
     }
 }

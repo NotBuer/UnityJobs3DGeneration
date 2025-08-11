@@ -96,7 +96,7 @@ namespace World
                     {
                         requiredChunks.Add(
                             _lastPlayerChunkPosition + 
-                            WorldUtils.GetGridPositionAsChunkPosition(gridPosition, chunkSize));
+                            WorldUtils.GetGridPositionAsChunkPosition(in gridPosition, in chunkSize));
                     }
                 }
             }

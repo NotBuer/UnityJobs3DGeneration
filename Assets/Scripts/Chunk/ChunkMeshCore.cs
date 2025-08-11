@@ -1,14 +1,18 @@
 using System.Runtime.CompilerServices;
+using ECS;
 using LowLevel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Entities;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Voxel;
 
 namespace Chunk
 {
+    [BurstCompile]
     public static class ChunkMeshCore
     {
         [BurstCompile]
@@ -79,7 +83,8 @@ namespace Chunk
                 if (voxelType == VoxelType.Air)
                     continue;
                 
-                var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, chunkSize, chunkSizeY);
+                ChunkUtils.UnflattenIndexTo3DLocalCoords(
+                    voxelIndex, chunkSize, chunkSizeY, out var x, out var y, out var z);
                 
                 var voxelPosition = new Vector3(
                     x + chunkCoord.x,
@@ -139,7 +144,8 @@ namespace Chunk
             in Vector3Int normal,
             in NativeParallelHashMap<Vector2Int, int>.ReadOnly coordTableHashMap)
         {
-            var (x, y, z) = ChunkUtils.UnflattenIndexTo3DLocalCoords(voxelIndex, chunkSize, chunkSizeY);
+            ChunkUtils.UnflattenIndexTo3DLocalCoords(
+                voxelIndex, chunkSize, chunkSizeY, out var x, out var y, out var z);
         
             var neighborY = y + normal.y;
             if (neighborY < 0 || neighborY >= chunkSizeY) return true;

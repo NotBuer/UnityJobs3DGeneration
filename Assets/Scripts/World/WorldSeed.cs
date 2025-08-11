@@ -50,7 +50,7 @@ namespace World
         /// </summary>
         /// <param name="input">The input string for which the hash is generated.</param>
         /// <returns>A stable 64-bit hash representing the input string.</returns>
-        private static unsafe ulong GetStableHash64(string input)
+        public static unsafe ulong GetStableHash64(string input)
         {
             if (string.IsNullOrEmpty(input)) return 0;
             
