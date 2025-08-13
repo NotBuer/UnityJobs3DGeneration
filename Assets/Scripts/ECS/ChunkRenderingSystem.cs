@@ -1,6 +1,4 @@
-﻿using System.Text;
-using LowLevel;
-using Unity.Burst;
+﻿using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -11,117 +9,126 @@ using UnityEngine.Rendering;
 
 namespace ECS
 {
-    // This system runs in the presentation group to ensure it runs after all simulation logic.
+    // --- System Refactoring ---
+    [BurstCompile]
+    // This system runs in the PresentationSystemGroup, which is the correct place for rendering logic.
     [UpdateInGroup(typeof(PresentationSystemGroup))]
-    public partial class ChunkRenderingSystem : SystemBase
+    [UpdateAfter(typeof(ChunkMeshingSystem))]
+    public partial struct ChunkRenderingSystem : ISystem
     {
-        private EntityCommandBufferSystem _entityCommandBufferSystem;
+        private EntityQuery _chunksWithMeshQuery;
+        private EntityQuery _chunksWithoutMeshQuery;
+        private EntityQuery _voxelResourceQuery;
         
-        protected override void OnCreate()
+        public void OnCreate(ref SystemState state)
         {
-            _entityCommandBufferSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
+            state.RequireForUpdate<BeginPresentationEntityCommandBufferSystem.Singleton>();
+            state.RequireForUpdate<VoxelRenderResources>();
+            // Query for chunks that have generated mesh data and need to be rendered.
+            _chunksWithMeshQuery = SystemAPI.QueryBuilder()
+                .WithAll<NeedsRenderingTag, ChunkCoordinate, ChunkMeshBounds>()
+                .WithAll<ChunkVertexBuffer, ChunkTriangleBuffer, ChunkNormalBuffer, ChunkColorBuffer>()
+                .Build();
+            
+            // Query for chunks that are tagged for rendering but have no mesh data (i.e., empty chunks).
+            _chunksWithoutMeshQuery = SystemAPI.QueryBuilder()
+                .WithAll<NeedsRenderingTag, ChunkCoordinate>()
+                .WithNone<ChunkVertexBuffer>()
+                .Build();
+            
+            _voxelResourceQuery = SystemAPI.QueryBuilder().WithAll<VoxelRenderResources>().Build();
+
+            // This system needs a material to work with. We create a singleton entity to hold it.
+            // This is done once on creation.
+            var resourceEntity = state.EntityManager.CreateEntity();
+            state.EntityManager.AddComponentObject(resourceEntity, new VoxelRenderResources
+            {
+                // In a real project, you would load this from an asset bundle or Resources folder.
+                VoxelMaterial = new Material(Shader.Find("Custom/VoxelShader_WithLighting"))
+            });
         }
         
-        protected override unsafe void OnUpdate()
-        {
-            // Must complete the dependency from the meshing system before can safely access the ChunkMesh components.
-            Dependency.Complete();
-            
-            var commandBuffer = _entityCommandBufferSystem.CreateCommandBuffer();
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state) { }
 
-            foreach (var (chunkMesh, coord, entity) 
-                     in SystemAPI.Query<RefRW<ChunkMesh>, RefRO<ChunkCoordinate>>().WithAll<NeedsRenderingTag>().WithEntityAccess())
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            // We must complete any incoming dependencies from the meshing job before we can read the buffers.
+            state.Dependency.Complete();
+
+            var ecb = SystemAPI.GetSingleton<BeginPresentationEntityCommandBufferSystem.Singleton>()
+                .CreateCommandBuffer(state.WorldUnmanaged);
+
+            var singletonEntity = _voxelResourceQuery.GetSingletonEntity();
+            var voxelResources = state.EntityManager.GetComponentObject<VoxelRenderResources>(singletonEntity);
+
+            var entitiesWithMesh = _chunksWithMeshQuery.ToEntityArray(Allocator.Temp);
+            foreach (var entity in entitiesWithMesh)
             {
-                // For empty chunks, set them up for rendering and move on.
-                if (!chunkMesh.ValueRO.IsCreated || chunkMesh.ValueRO.Vertices->IsEmpty)
-                {
-                    commandBuffer.AddComponent<LocalToWorld>(entity);
-                    commandBuffer.AddComponent<RenderBounds>(entity);
-                    commandBuffer.AddComponent<MaterialMeshInfo>(entity);
-                    commandBuffer.RemoveComponent<NeedsRenderingTag>(entity);
-                    chunkMesh.ValueRW.Dispose();
-                    continue;
-                }
+                // Get the mesh data buffers from the entity.
+                var coord = SystemAPI.GetComponent<ChunkCoordinate>(entity);
+                var bounds = SystemAPI.GetComponent<ChunkMeshBounds>(entity);
+                var vertices = SystemAPI.GetBuffer<ChunkVertexBuffer>(entity);
+                var triangles = SystemAPI.GetBuffer<ChunkTriangleBuffer>(entity);
+                var normals = SystemAPI.GetBuffer<ChunkNormalBuffer>(entity);
+                var colors = SystemAPI.GetBuffer<ChunkColorBuffer>(entity);
                 
-                // Create a new mesh from job's data.
+                // Create a new Unity Mesh. This must be done on the main thread.
                 var mesh = new Mesh
                 {
-                    name = new StringBuilder($"ChunkMesh ({coord.ValueRO.Value.x}, {coord.ValueRO.Value.y})").ToString(),
-                    bounds = chunkMesh.ValueRO.Bounds
+                    name = $"ChunkMesh {coord.Value.x}:{coord.Value.y}",
+                    bounds = bounds.Value
                 };
                 
-                var vertexAttributes = new NativeArray<VertexAttributeDescriptor>
-                    (3, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            
-                vertexAttributes[0] = new VertexAttributeDescriptor
-                    (VertexAttribute.Position, VertexAttributeFormat.Float32, 3, stream: 0);
-                vertexAttributes[1] = new VertexAttributeDescriptor
-                    (VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, stream: 1);
-                vertexAttributes[2] = new VertexAttributeDescriptor
-                    (VertexAttribute.Color, VertexAttributeFormat.UNorm8, dimension: 4, stream: 2);
+                // Define the vertex layout.
+                var vertexAttributes = new NativeArray<VertexAttributeDescriptor>(3, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
+                {
+                    [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3, stream: 0),
+                    [1] = new VertexAttributeDescriptor(VertexAttribute.Normal, VertexAttributeFormat.Float32, 3, stream: 1),
+                    [2] = new VertexAttributeDescriptor(VertexAttribute.Color, VertexAttributeFormat.UNorm8, 4, stream: 2)
+                };
                 
-                mesh.SetVertexBufferParams(chunkMesh.ValueRO.Vertices->Length, vertexAttributes);
-                mesh.SetIndexBufferParams(chunkMesh.ValueRO.Triangles->Length, IndexFormat.UInt32);
-                
-                mesh.SetVertexBufferData(
-                    NativeArrayUnsafe.AsNativeArray(chunkMesh.ValueRO.Vertices), 
-                    0, 
-                    0, 
-                    chunkMesh.ValueRO.Vertices->Length, 
-                    stream: 0);
-                
-                mesh.SetVertexBufferData(
-                    NativeArrayUnsafe.AsNativeArray(chunkMesh.ValueRO.Normals),
-                    0,
-                    0,
-                    chunkMesh.ValueRO.Normals->Length,
-                    stream: 1);
-                
-                mesh.SetVertexBufferData(
-                    NativeArrayUnsafe.AsNativeArray(chunkMesh.ValueRO.Colors),
-                    0,
-                    0,
-                    chunkMesh.ValueRO.Colors->Length,
-                    stream: 2);
-                
-                mesh.SetIndexBufferData(
-                    NativeArrayUnsafe.AsNativeArray(chunkMesh.ValueRO.Triangles),
-                    0,
-                    0,
-                    chunkMesh.ValueRO.Triangles->Length);
-
+                mesh.SetVertexBufferParams(vertices.Length, vertexAttributes);
                 vertexAttributes.Dispose();
+                
+                mesh.SetVertexBufferData(vertices.AsNativeArray().Reinterpret<float3>(), 0, 0, vertices.Length, 0);
+                mesh.SetVertexBufferData(normals.AsNativeArray().Reinterpret<float3>(), 0, 0, normals.Length, 1);
+                mesh.SetVertexBufferData(colors.AsNativeArray().Reinterpret<Color32>(), 0, 0, colors.Length, 2);
+                
+                mesh.SetIndexBufferParams(triangles.Length, IndexFormat.UInt32);
+                mesh.SetIndexBufferData(triangles.AsNativeArray().Reinterpret<int>(), 0, 0, triangles.Length);
 
                 mesh.subMeshCount = 1;
-                mesh.SetSubMesh(0,
-                    new SubMeshDescriptor(0, chunkMesh.ValueRO.Triangles->Length), flags:
-                    MeshUpdateFlags.DontValidateIndices | 
-                    MeshUpdateFlags.DontResetBoneBounds | 
-                    MeshUpdateFlags.DontNotifyMeshUsers | 
-                    MeshUpdateFlags.DontRecalculateBounds);
+                mesh.SetSubMesh(0, new SubMeshDescriptor(0, triangles.Length), MeshUpdateFlags.DontRecalculateBounds);
+
+                // Add all necessary components for rendering.
+                var renderMesh = new RenderMeshUnmanaged(mesh, voxelResources.VoxelMaterial);
+                ecb.AddComponent(entity, renderMesh);
+                ecb.AddComponent(entity, new LocalToWorld { Value = float4x4.Translate(new float3(coord.Value.x, 0, coord.Value.y)) });
+                ecb.AddComponent(entity, new RenderBounds { Value = mesh.bounds.ToAABB() });
+                ecb.AddComponent<MaterialMeshInfo>(entity);
                 
-                // Add the essential rendering parts to the entity.
-                // TODO: Find optimized way to pass the material.
-                var renderMeshUnmanaged = new RenderMeshUnmanaged(
-                    mesh,
-                    new Material(Shader.Find("Custom/VoxelShader_WithLighting")));
+                // Clean up the temporary mesh data buffers.
+                ecb.RemoveComponent<ChunkVertexBuffer>(entity);
+                ecb.RemoveComponent<ChunkTriangleBuffer>(entity);
+                ecb.RemoveComponent<ChunkNormalBuffer>(entity);
+                ecb.RemoveComponent<ChunkColorBuffer>(entity);
+                ecb.RemoveComponent<ChunkMeshBounds>(entity);
                 
-                commandBuffer.AddComponent(entity, renderMeshUnmanaged);
-                commandBuffer.AddComponent(entity, 
-                    new LocalToWorld
-                    {
-                        Value = float4x4.Translate(new float3(coord.ValueRO.Value.x, 0, coord.ValueRO.Value.y))
-                    });
-                commandBuffer.AddComponent(entity, new RenderBounds { Value = mesh.bounds.ToAABB() });
-                commandBuffer.AddComponent<MaterialMeshInfo>(entity);
-                
-                // Clean up
-                chunkMesh.ValueRW.Dispose();
-                commandBuffer.AddComponent<ActiveChunkTag>(entity);
-                commandBuffer.RemoveComponent<NeedsRenderingTag>(entity);
+                // Transition the chunk to its final, active state.
+                ecb.RemoveComponent<NeedsRenderingTag>(entity);
+                ecb.AddComponent<ActiveChunkTag>(entity);
             }
+            entitiesWithMesh.Dispose();
+            
+            var emptyChunkEntities = _chunksWithoutMeshQuery.ToEntityArray(Allocator.Temp);
+            foreach (var entity in emptyChunkEntities)
+            {
+                ecb.RemoveComponent<NeedsRenderingTag>(entity);
+                ecb.AddComponent<ActiveChunkTag>(entity);
+            }
+            emptyChunkEntities.Dispose();
         }
-        
-        protected override void OnDestroy() { }
     }
 }

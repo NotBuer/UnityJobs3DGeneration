@@ -1,5 +1,6 @@
 using Unity.Entities;
 using Unity.Mathematics;
+using UnityEngine;
 using Voxel;
 
 namespace ECS
@@ -49,12 +50,82 @@ namespace ECS
     }
 
     /// <summary>
+    /// Represents the state of chunk spawning, including tracking the player's last known chunk position.
+    /// </summary>
+    public struct ChunkSpawningState : IComponentData
+    {
+        public int2 LastPlayerChunkPos;
+    }
+
+    /// <summary>
     /// A dynamic buffer attached to a chunk entity that holds its raw voxel data.
     /// </summary>
     [InternalBufferCapacity(0)]
     public struct VoxelDataBuffer : IBufferElementData
     {
         public VoxelType Value;
+    }
+
+    /// <summary>
+    /// A dynamic buffer attached to a chunk entity that holds the vertex data for the chunk's mesh.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct ChunkVertexBuffer : IBufferElementData
+    {
+        public float3 Value;
+    }
+
+    /// <summary>
+    /// A dynamic buffer attached to a chunk entity that holds triangle index data for the chunk's mesh.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct ChunkTriangleBuffer : IBufferElementData
+    {
+        public int Value;
+    }
+
+    /// <summary>
+    /// A dynamic buffer attached to a chunk entity that holds its normals data for the mesh.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct ChunkNormalBuffer : IBufferElementData
+    {
+        public float3 Value;
+    }
+
+    /// <summary>
+    /// A dynamic buffer attached to a chunk entity that holds the color information for each vertex in the chunk.
+    /// </summary>
+    [InternalBufferCapacity(0)]
+    public struct ChunkColorBuffer : IBufferElementData
+    {
+        public Color32 Value;
+    }
+
+    /// <summary>
+    /// Component holding the bounding volume of a chunk's mesh, used for spatial calculations and culling.
+    /// </summary>
+    public struct ChunkMeshBounds : IComponentData
+    {
+        public Bounds Value;
+    }
+
+    /// <summary>
+    /// A configuration component for world generation settings, used to define frequency, amplitude, and seed values for procedural generation.
+    /// </summary>
+    public struct WorldGenerationConfig : IComponentData
+    {
+        public float Frequency;
+        public float Amplitude;
+        public ulong Seed;
+    }
+
+    /// <summary>
+    /// Component that holds rendering resources required for voxel rendering, specifically the material to be used.
+    /// </summary>
+    public class VoxelRenderResources : IComponentData
+    {
+        public Material VoxelMaterial;
     }
     
 }

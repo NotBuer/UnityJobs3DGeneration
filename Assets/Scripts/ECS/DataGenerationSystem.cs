@@ -5,55 +5,72 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 using Voxel;
-using World;
 
 namespace ECS
 {
+    [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(ChunkInitializationSystem))]
-    public partial class DataGenerationSystem : SystemBase
+    public partial struct DataGenerationSystem : ISystem
     {
-        private EntityCommandBufferSystem _entityCommandBufferSystem;
+        private EntityQuery _chunksToGenerateQuery;
 
-        protected override void OnCreate()
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
         {
-            _entityCommandBufferSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
-        }
-        
-        protected override void OnUpdate()
-        {
-            var chunksToGenerateQuery =
-                SystemAPI.QueryBuilder().WithAll<NeedsDataGenerationTag, ChunkCoordinate, VoxelDataBuffer>().Build();
+            state.RequireForUpdate<BeginSimulationEntityCommandBufferSystem.Singleton>();
+            state.RequireForUpdate<WorldGenerationConfig>();
             
-            if (chunksToGenerateQuery.IsEmpty) return;
+            _chunksToGenerateQuery = SystemAPI.QueryBuilder()
+                .WithAll<NeedsDataGenerationTag, ChunkCoordinate>()
+                // We also need write access to the buffer.
+                .WithAllRW<VoxelDataBuffer>()
+                .Build();
             
-            var commandBuffer = _entityCommandBufferSystem.CreateCommandBuffer();
+            state.RequireForUpdate(_chunksToGenerateQuery);
             
-            // Schedule de data generation job.
-            var dataGenerationJob = new DataGenerationJob
+            if (SystemAPI.HasSingleton<WorldGenerationConfig>()) return;
+            
+            // Create the configuration singleton if it doesn't exist.
+            var configEntity = state.EntityManager.CreateEntity();
+            state.EntityManager.AddComponentData(configEntity, new WorldGenerationConfig
             {
                 Frequency = 0.01f,
                 Amplitude = 32f,
-                Seed = WorldSeed.GetStableHash64("boer12345"),
-                CommandBuffer = commandBuffer.AsParallelWriter()
-            };
-            
-            var jobHandle = dataGenerationJob.ScheduleParallel(chunksToGenerateQuery, Dependency);
-            _entityCommandBufferSystem.AddJobHandleForProducer(jobHandle);
-            Dependency = jobHandle;
+                Seed = World.WorldSeed.GetStableHash64("boer12345")
+            });
         }
         
-        protected override void OnDestroy() { }
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state) { }
+        
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
+        {
+            // Get the command buffer for our structural changes.
+            var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
+            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
+            
+            // Get the world generation parameters from our singleton.
+            var config = SystemAPI.GetSingleton<WorldGenerationConfig>();
+
+            // Prepare the data generation job with the config values.
+            var dataGenerationJob = new DataGenerationJob
+            {
+                Config = config,
+                CommandBuffer = ecb
+            };
+
+            // Schedule the job and chain the dependencies.
+            state.Dependency = dataGenerationJob.ScheduleParallel(_chunksToGenerateQuery, state.Dependency);
+        }
     }
-
-
 
     [BurstCompile]
     public partial struct DataGenerationJob : IJobEntity
     {
-        [ReadOnly] public float Frequency;
-        [ReadOnly] public float Amplitude;
-        [ReadOnly] public ulong Seed;
+        // By passing the whole config struct, we keep the job's fields tidy.
+        [ReadOnly] public WorldGenerationConfig Config;
         public EntityCommandBuffer.ParallelWriter CommandBuffer;
         
         public void Execute(
@@ -62,7 +79,7 @@ namespace ECS
             in ChunkCoordinate coord, 
             DynamicBuffer<VoxelDataBuffer> voxelBuffer)
         {
-            var lower32 = (uint)(Seed & 0xFFFFFFFF);
+            var lower32 = (uint)(Config.Seed & 0xFFFFFFFF);
             // var upper32 = (uint)((Seed >> 32) & 0xFFFFFFFF);
             var offsetX = (lower32 & 0xFFFF) * 0.001f;
             var offsetZ = ((lower32 >> 16) & 0xFFFF) * 0.001f;
@@ -75,15 +92,15 @@ namespace ECS
                 {
                     var noiseValue = noise.snoise(
                         new float2(
-                            (coord.Value.x + x) * Frequency + noiseOffset.x,
-                            (coord.Value.y + z) * Frequency + noiseOffset.y
+                            (coord.Value.x + x) * Config.Frequency + noiseOffset.x,
+                            (coord.Value.y + z) * Config.Frequency + noiseOffset.y
                         )
                     );
                     
                     // Normalize to 0-1 range for height calculations
                     noiseValue = (noiseValue + 1) * 0.5f;
                     
-                    var height = Mathf.RoundToInt(noiseValue * Amplitude);
+                    var height = Mathf.RoundToInt(noiseValue * Config.Amplitude);
     
                     for (byte y = 0; y < VoxelConstants.ChunkSizeY; y++)
                     {

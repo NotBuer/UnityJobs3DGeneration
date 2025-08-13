@@ -1,11 +1,8 @@
 using System.Runtime.CompilerServices;
-using ECS;
 using LowLevel;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Entities;
-using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Voxel;
@@ -112,7 +109,9 @@ namespace Chunk
                         
                         vertices->AddNoResize(vertex);
                         normals->AddNoResize(VoxelUtils.Normals[faceIndex]);
-                        colors->AddNoResize(VoxelUtils.GetVoxelColor(in voxelType));
+                        
+                        VoxelUtils.GetVoxelColor(in voxelType, out var color);
+                        colors->AddNoResize(color);
                         
                         boundsMin = Vector3.Min(boundsMin, vertex);
                         boundsMax = Vector3.Max(boundsMax, vertex);

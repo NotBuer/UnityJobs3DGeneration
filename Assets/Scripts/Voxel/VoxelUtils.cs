@@ -12,7 +12,19 @@ namespace Voxel
         public const byte FaceCount = 6;
         public const byte FaceEdges = 4;
         
-        public static readonly Vector3[] Vertices = new Vector3[8]
+        public static readonly Vector3[] Vertices =
+        {
+            new(-0.5f, -0.5f,  0.5f), // Back bottom-left
+            new( 0.5f, -0.5f,  0.5f), // Back bottom-right
+            new( 0.5f, -0.5f, -0.5f), // Front bottom-right
+            new(-0.5f, -0.5f, -0.5f), // Front bottom-left
+            new(-0.5f,  0.5f,  0.5f), // Back top-left
+            new( 0.5f,  0.5f,  0.5f), // Back top-right
+            new( 0.5f,  0.5f, -0.5f), // Front top-right
+            new(-0.5f,  0.5f, -0.5f)  // Front top-left     
+        };
+        
+        public static readonly float3[] VerticesFloat3 =
         {
             new(-0.5f, -0.5f,  0.5f), // Back bottom-left
             new( 0.5f, -0.5f,  0.5f), // Back bottom-right
@@ -24,7 +36,7 @@ namespace Voxel
             new(-0.5f,  0.5f, -0.5f)  // Front top-left     
         };
 
-        public static readonly Vector3Int[] Normals = new Vector3Int[6]
+        public static readonly Vector3Int[] Normals =
         {
             new( 0,  0, -1), // Front Face
             new( 0,  0,  1), // Back Face
@@ -34,7 +46,7 @@ namespace Voxel
             new( 0,  1,  0)  // Top Face
         };
         
-        public static readonly int3[] NormalsInt3 = new int3[6]
+        public static readonly int3[] NormalsInt3 =
         {
             new( 0,  0, -1), // Front Face
             new( 0,  0,  1), // Back Face
@@ -44,7 +56,7 @@ namespace Voxel
             new( 0,  1,  0)  // Top Face
         };
 
-        public static readonly byte[] FaceVertices = new byte[6 * 4]
+        public static readonly byte[] FaceVertices =
         {
             3, 2, 6, 7, // Front Face (Z-)
             1, 0, 4, 5, // Back Face (Z+)
@@ -60,10 +72,11 @@ namespace Voxel
         
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Color32 GetVoxelColor(
-            in VoxelType voxelType)
+        public static void GetVoxelColor(
+            in VoxelType voxelType,
+            out Color32 color)
         {
-            return voxelType switch
+            color = voxelType switch
             {
                 VoxelType.Grass => GrassColor,
                 VoxelType.Dirt => DirtColor,

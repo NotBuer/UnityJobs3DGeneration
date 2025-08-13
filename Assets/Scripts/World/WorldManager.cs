@@ -70,14 +70,13 @@ namespace World
         {
             if (!_isWorldInitialized) return;
             
-            var currentPlayerChunkPosition = WorldUtils.GetChunkCoordinateFromWorldPosition
-                (DebugCamera.Instance.transform.position, in chunkSize);
+            WorldUtils.GetChunkCoordinateFromWorldPosition
+                (DebugCamera.Instance.transform.position, in chunkSize, out var playerChunkPosition);
 
-            if (_lastPlayerChunkPosition != currentPlayerChunkPosition)
-            {
-                _lastPlayerChunkPosition = currentPlayerChunkPosition;
-                WorldChunksUpdate();   
-            }
+            if (_lastPlayerChunkPosition == playerChunkPosition) return;
+            
+            _lastPlayerChunkPosition = playerChunkPosition;
+            WorldChunksUpdate();
         }
         
         private void WorldChunksUpdate()
@@ -92,12 +91,14 @@ namespace World
                 for (var z = -renderDistance; z <= renderDistance; z++)
                 {
                     var gridPosition = new Vector2Int(x, z);
-                    if (gridPosition.sqrMagnitude <= renderDistanceSqr)
-                    {
-                        requiredChunks.Add(
-                            _lastPlayerChunkPosition + 
-                            WorldUtils.GetGridPositionAsChunkPosition(in gridPosition, in chunkSize));
-                    }
+                    if (gridPosition.sqrMagnitude > renderDistanceSqr) continue;
+                    
+                    WorldUtils.GetGridPositionAsChunkPosition(
+                        in gridPosition, in chunkSize, out var chunkPosition);
+                        
+                    requiredChunks.Add(
+                        _lastPlayerChunkPosition + 
+                        chunkPosition);
                 }
             }
 

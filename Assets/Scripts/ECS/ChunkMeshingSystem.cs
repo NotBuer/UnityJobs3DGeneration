@@ -2,7 +2,6 @@
 using Chunk;
 using Unity.Burst;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -10,75 +9,73 @@ using Voxel;
 
 namespace ECS
 {
-    public unsafe struct ChunkMesh : IComponentData
-    {
-        public UnsafeList<Vector3>* Vertices;
-        public UnsafeList<int>* Triangles;
-        public UnsafeList<Vector3>* Normals;
-        public UnsafeList<Color32>* Colors;
-        public Bounds Bounds;
-
-        public bool IsCreated => Vertices != null && Vertices->IsCreated;
-
-        public void Dispose()
-        {
-            if (Vertices != null && Vertices->IsCreated) Vertices->Dispose();
-            if (Triangles != null && Triangles->IsCreated) Triangles->Dispose();
-            if (Normals != null && Normals->IsCreated) Normals->Dispose();
-            if (Colors != null && Colors->IsCreated) Colors->Dispose();
-        }
-    }
-
+    [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
     [UpdateAfter(typeof(DataGenerationSystem))]
-    public partial class ChunkMeshingSystem : SystemBase
+    public partial struct ChunkMeshingSystem : ISystem
     {
-        private EntityCommandBufferSystem _entityCommandBufferSystem;
         private EntityQuery _meshingQuery;
-        private EntityQuery _allChunksQuery;
-        
-        protected override void OnCreate()
+        private EntityQuery _readyChunksQuery;
+
+        [BurstCompile]
+        public void OnCreate(ref SystemState state)
         {
-            _entityCommandBufferSystem = World.GetOrCreateSystemManaged<EndSimulationEntityCommandBufferSystem>();
+            state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
             
-            _meshingQuery = 
-                SystemAPI.QueryBuilder().WithAll<NeedsMeshingTag, ChunkCoordinate, VoxelDataBuffer>().Build();
+            _meshingQuery = SystemAPI.QueryBuilder()
+                .WithAll<NeedsMeshingTag, ChunkCoordinate, VoxelDataBuffer>()
+                .Build();
+
+            _readyChunksQuery = SystemAPI.QueryBuilder()
+                .WithAll<ChunkCoordinate, VoxelDataBuffer>()
+                .WithNone<ToUnloadTag, NeedsDataGenerationTag, NeedsMeshingTag>()
+                .Build();
             
-            _allChunksQuery =
-                SystemAPI.QueryBuilder().WithAll<ChunkCoordinate>().Build();
+            state.RequireForUpdate(_meshingQuery);
         }
         
-        protected override void OnUpdate()
+        [BurstCompile]
+        public void OnDestroy(ref SystemState state) { }
+        
+        [BurstCompile]
+        public void OnUpdate(ref SystemState state)
         {
-            if (_meshingQuery.IsEmpty) return;
-            
-            // The job will use this map to find the neighbor entities.
-            var coordToEntityMap = new NativeParallelHashMap<int2, Entity>
-                (_allChunksQuery.CalculateEntityCount(), Allocator.TempJob);
-            var coordPopulateJob = new PopulateCoordMapJob
+            // --- Job 1: Populate Neighbor Map ---
+            // This map is essential for the meshing job to look up neighbor chunks.
+            var coordToEntityMap = new NativeParallelHashMap<int2, Entity>(
+                _readyChunksQuery.CalculateEntityCount(), Allocator.TempJob);
+
+            var populateCoordMapJob = new PopulateCoordMapJob
             {
                 CoordToEntityMap = coordToEntityMap.AsParallelWriter()
             };
-            var coordPopulateJobHandle = coordPopulateJob.ScheduleParallel(_allChunksQuery, Dependency);
+            
+            // Schedule the first job, depending on the state of the world before this system.
+            var populateJobHandle = populateCoordMapJob.ScheduleParallel(_readyChunksQuery, state.Dependency);
 
-            var commandBuffer = _entityCommandBufferSystem.CreateCommandBuffer();
+            // --- Job 2: Generate Mesh ---
+            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
+            var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
+
             var meshingJob = new MeshingJob
             {
+                CommandBuffer = ecb,
+                VoxelDataBufferLookup = SystemAPI.GetBufferLookup<VoxelDataBuffer>(true),
+                CoordToEntityMap = coordToEntityMap.AsReadOnly(),
                 ChunkSize = VoxelConstants.ChunkSize,
-                ChunkSizeY = VoxelConstants.ChunkSizeY,
-                ChunkVoxelCount = ChunkUtils.GetChunkTotalSize(VoxelConstants.ChunkSize, VoxelConstants.ChunkSizeY),
-                CommandBuffer = commandBuffer.AsParallelWriter(),
-                CoordToEntityMap = coordToEntityMap,
-                VoxelDataBufferLookup = SystemAPI.GetBufferLookup<VoxelDataBuffer>(true)
+                ChunkSizeY = VoxelConstants.ChunkSizeY
             };
-            var meshingJobHandle = meshingJob.ScheduleParallel(_meshingQuery, coordPopulateJobHandle);
             
-            _entityCommandBufferSystem.AddJobHandleForProducer(meshingJobHandle);
+            // CRITICAL: Schedule the second job. Its dependency is the handle from the FIRST job.
+            // This ensures the map is fully populated before the meshing job tries to read from it.
+            var meshingJobHandle = meshingJob.ScheduleParallel(_meshingQuery, populateJobHandle);
+
+            // We must dispose the map. We pass the handle of the *last* job that uses it.
             coordToEntityMap.Dispose(meshingJobHandle);
-            Dependency = meshingJobHandle;
+
+            // Finally, update the system's dependency to be the handle of our final job.
+            state.Dependency = meshingJobHandle;
         }
-        
-        protected override void OnDestroy() { }
     }
 
     [BurstCompile]
@@ -92,16 +89,14 @@ namespace ECS
         }
     }
 
-    [BurstCompile]
-    public unsafe partial struct MeshingJob : IJobEntity
+        [BurstCompile]
+    public partial struct MeshingJob : IJobEntity
     {
         public EntityCommandBuffer.ParallelWriter CommandBuffer;
         [ReadOnly] public BufferLookup<VoxelDataBuffer> VoxelDataBufferLookup;
-        [ReadOnly] public NativeParallelHashMap<int2, Entity> CoordToEntityMap;
-
-        [ReadOnly] public byte ChunkSize;
-        [ReadOnly] public byte ChunkSizeY;
-        [ReadOnly] public int ChunkVoxelCount;
+        [ReadOnly] public NativeParallelHashMap<int2, Entity>.ReadOnly CoordToEntityMap;
+        [ReadOnly] public int ChunkSize;
+        [ReadOnly] public int ChunkSizeY;
         
         public void Execute(
             Entity entity, 
@@ -109,115 +104,80 @@ namespace ECS
             in ChunkCoordinate coord,
             in DynamicBuffer<VoxelDataBuffer> localVoxelBuffer)
         {
-            var visibleFaces = 0;
-            for (var voxelIndex = 0; voxelIndex < ChunkVoxelCount; voxelIndex++)
-            {
-                if (localVoxelBuffer[voxelIndex].Value == VoxelType.Air) continue;
-                for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
-                {
-                    if (IsFaceVisible(
-                            in voxelIndex,
-                            in VoxelUtils.NormalsInt3[faceIndex],
-                            in coord.Value,
-                            in localVoxelBuffer))
-                    {
-                        visibleFaces++;
-                    }
-                }
-            }
+            // Use Temp allocator for mesh data; it's short-lived.
+            var vertices = new NativeList<float3>(Allocator.Temp);
+            var triangles = new NativeList<int>(Allocator.Temp);
+            var normals = new NativeList<float3>(Allocator.Temp);
+            var colors = new NativeList<Color32>(Allocator.Temp);
 
-            if (visibleFaces == 0)
-            {
-                CommandBuffer.RemoveComponent<NeedsMeshingTag>(chunkIndex, entity);
-                CommandBuffer.AddComponent<NeedsRenderingTag>(chunkIndex, entity);
-                CommandBuffer.AddComponent(chunkIndex, entity, new ChunkMesh());
-                return;
-            }
-
-            var vertices = 
-                UnsafeList<Vector3>.Create(visibleFaces * VoxelUtils.FaceEdges, Allocator.TempJob);
-            var triangles = 
-                UnsafeList<int>.Create(visibleFaces * VoxelUtils.FaceCount, Allocator.TempJob);
-            var normals = 
-                UnsafeList<Vector3>.Create(visibleFaces * VoxelUtils.FaceEdges, Allocator.TempJob);
-            var colors = 
-                UnsafeList<Color32>.Create(visibleFaces * VoxelUtils.FaceEdges, Allocator.TempJob);
-
-            var boundsMin = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
-            var boundsMax = new Vector3(float.MinValue, float.MinValue, float.MinValue);
-            var vertexIndex = 0;
+            var boundsMin = new float3(float.MaxValue);
+            var boundsMax = new float3(float.MinValue);
             
-            for (var voxelIndex = 0; voxelIndex < ChunkVoxelCount; voxelIndex++)
+            for (var i = 0; i < localVoxelBuffer.Length; i++)
             {
-                var voxelType = localVoxelBuffer[voxelIndex].Value;
+                var voxelType = localVoxelBuffer[i].Value;
+                if (voxelType == (byte)VoxelType.Air) continue;
                 
-                if (voxelType == VoxelType.Air) continue;
-                
-                ChunkUtils.UnflattenIndexTo3DLocalCoords(
-                    voxelIndex, ChunkSize, ChunkSizeY, out var x, out var y, out var z);
-                
-                var voxelPosition = new Vector3(
-                    x + coord.Value.x,
-                    y,
-                    z + coord.Value.y);
+                ChunkUtils.UnflattenIndexTo3DLocalCoords(i, ChunkSize, ChunkSizeY, out var x, out var y, out var z);
+                var voxelPosition = new float3(x, y, z);
                 
                 for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
                 {
-                    if (!IsFaceVisible(
-                            in voxelIndex,
-                            in VoxelUtils.NormalsInt3[faceIndex],
-                            in coord.Value,
-                            in localVoxelBuffer)) continue;
+                    if (!IsFaceVisible(i, VoxelUtils.NormalsInt3[faceIndex], coord.Value, localVoxelBuffer)) continue;
 
+                    var vertexIndex = vertices.Length;
                     for (byte j = 0; j < VoxelUtils.FaceEdges; j++)
                     {
-                        var vertex =
-                            voxelPosition + 
-                            VoxelUtils.Vertices[VoxelUtils.FaceVertices[faceIndex * VoxelUtils.FaceEdges + j]];
+                        var vertex = voxelPosition + VoxelUtils.VerticesFloat3[VoxelUtils.FaceVertices[faceIndex * VoxelUtils.FaceEdges + j]];
+                        vertices.Add(vertex);
+                        normals.Add(VoxelUtils.NormalsInt3[faceIndex]);
+                        VoxelUtils.GetVoxelColor(voxelType, out var color);
+                        colors.Add(color);
                         
-                        vertices->AddNoResize(vertex);
-                        normals->AddNoResize(VoxelUtils.Normals[faceIndex]);
-                        colors->AddNoResize(VoxelUtils.GetVoxelColor(in voxelType));
-                        
-                        boundsMin = Vector3.Min(boundsMin, vertex);
-                        boundsMax = Vector3.Max(boundsMax, vertex);
+                        boundsMin = math.min(boundsMin, vertex);
+                        boundsMax = math.max(boundsMax, vertex);
                     }
                     
-                    triangles->AddNoResize(vertexIndex);
-                    triangles->AddNoResize(vertexIndex + 3);
-                    triangles->AddNoResize(vertexIndex + 2);
-                    triangles->AddNoResize(vertexIndex);
-                    triangles->AddNoResize(vertexIndex + 2);
-                    triangles->AddNoResize(vertexIndex + 1);
-                    
-                    vertexIndex += VoxelUtils.FaceEdges;
+                    triangles.Add(vertexIndex);
+                    triangles.Add(vertexIndex + 1);
+                    triangles.Add(vertexIndex + 2);
+                    triangles.Add(vertexIndex);
+                    triangles.Add(vertexIndex + 2);
+                    triangles.Add(vertexIndex + 3);
                 }
             }
-            
-            CommandBuffer.AddComponent(chunkIndex, entity, new ChunkMesh
+
+            if (vertices.Length > 0)
             {
-                Vertices = vertices,
-                Triangles = triangles,
-                Normals = normals,
-                Colors = colors,
-                Bounds = new Bounds((boundsMin + boundsMax) * 0.5f, boundsMax - boundsMin)
-            });
+                // Add mesh data to dynamic buffers on the entity.
+                var vertBuffer = CommandBuffer.AddBuffer<ChunkVertexBuffer>(chunkIndex, entity);
+                vertBuffer.CopyFrom(vertices.AsArray().Reinterpret<ChunkVertexBuffer>());
+
+                var triBuffer = CommandBuffer.AddBuffer<ChunkTriangleBuffer>(chunkIndex, entity);
+                triBuffer.CopyFrom(triangles.AsArray().Reinterpret<ChunkTriangleBuffer>());
+
+                var normBuffer = CommandBuffer.AddBuffer<ChunkNormalBuffer>(chunkIndex, entity);
+                normBuffer.CopyFrom(normals.AsArray().Reinterpret<ChunkNormalBuffer>());
+                
+                var colorBuffer = CommandBuffer.AddBuffer<ChunkColorBuffer>(chunkIndex, entity);
+                colorBuffer.CopyFrom(colors.AsArray().Reinterpret<ChunkColorBuffer>());
+
+                var bounds = new Bounds();
+                bounds.SetMinMax(boundsMin, boundsMax);
+                CommandBuffer.AddComponent(chunkIndex, entity, new ChunkMeshBounds { Value = bounds });
+            }
             
-            // Transition the state.
+            // Transition the chunk to the next state.
             CommandBuffer.RemoveComponent<NeedsMeshingTag>(chunkIndex, entity);
             CommandBuffer.AddComponent<NeedsRenderingTag>(chunkIndex, entity);
         }
         
         [BurstCompile]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsFaceVisible(
-            in int voxelIndex,
-            in int3 normal,
-            in int2 chunkCoord,
-            in DynamicBuffer<VoxelDataBuffer> localVoxelBuffer)
+        private bool IsFaceVisible(int voxelIndex, int3 normal, int2 chunkCoord, in DynamicBuffer<VoxelDataBuffer> localVoxelBuffer)
         {
-            ChunkUtils.UnflattenIndexTo3DLocalCoords(
-                voxelIndex, ChunkSize, ChunkSizeY, out var x, out var y, out var z);
+            ChunkUtils.UnflattenIndexTo3DLocalCoords
+                (voxelIndex, ChunkSize, ChunkSizeY, out var x, out var y, out var z);
             
             var neighborPos = new int3(x, y, z) + normal;
             
@@ -226,29 +186,81 @@ namespace ECS
             if (neighborPos.x >= 0 && neighborPos.x < ChunkSize && neighborPos.z >= 0 && neighborPos.z < ChunkSize)
             {
                 return localVoxelBuffer[
-                    ChunkUtils.Flatten3DLocalCoordsToIndex(
-                        0, neighborPos.x, neighborPos.y, neighborPos.z, ChunkSize, ChunkSizeY)]
-                    .Value == VoxelType.Air;
+                        ChunkUtils.Flatten3DLocalCoordsToIndex
+                            (0, neighborPos.x, neighborPos.y, neighborPos.z, ChunkSize, ChunkSizeY)]
+                    .Value == (byte)VoxelType.Air;
             }
-
-            var neighborChunkCoord = new int2(
-                chunkCoord.x + (normal.x * ChunkSize),
-                chunkCoord.y + (normal.z * ChunkSize)
-            );
             
+            var neighborChunkCoord = chunkCoord + new int2(normal.x, normal.z);
             if (!CoordToEntityMap.TryGetValue(neighborChunkCoord, out var neighborChunkEntity)) return true;
-
+            if (!VoxelDataBufferLookup.HasBuffer(neighborChunkEntity)) return true;
+            
             var neighborVoxelBuffer = VoxelDataBufferLookup[neighborChunkEntity];
             var neighborLocalPos = new int3(
-                (neighborPos.x + ChunkSize) % ChunkSize,
-                 neighborPos.y,
-                (neighborPos.z + ChunkSize) % ChunkSize
-            );
+                (neighborPos.x % ChunkSize + ChunkSize) % ChunkSize, 
+                 neighborPos.y, 
+                (neighborPos.z % ChunkSize + ChunkSize) % ChunkSize);
             
             return neighborVoxelBuffer[
-                    ChunkUtils.Flatten3DLocalCoordsToIndex(
-                        0, neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z, ChunkSize, ChunkSizeY)]
-                .Value == VoxelType.Air;
+                ChunkUtils.Flatten3DLocalCoordsToIndex
+                    (0, neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z, ChunkSize, ChunkSizeY)]
+                .Value == (byte)VoxelType.Air;
         }
+        
+        // [BurstCompile]
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // private bool IsFaceVisible(
+        //     in int voxelIndex,
+        //     in int3 normal,
+        //     in int2 chunkCoord,
+        //     in DynamicBuffer<VoxelDataBuffer> localVoxelBuffer)
+        // {
+        //     ChunkUtils.UnflattenIndexTo3DLocalCoords(
+        //         voxelIndex, ChunkSize, ChunkSizeY, out var x, out var y, out var z);
+        //     
+        //     var neighborPos = new int3(x, y, z) + normal;
+        //     
+        //     // Face is visible if it's at the vertical edge of the world.
+        //     if (neighborPos.y < 0 || neighborPos.y >= ChunkSizeY) return true;
+        //     
+        //     // Check if the neighbor is within the bounds of the current chunk.
+        //     if (neighborPos.x >= 0 && neighborPos.x < ChunkSize && neighborPos.z >= 0 && neighborPos.z < ChunkSize)
+        //     {
+        //         return localVoxelBuffer[
+        //             ChunkUtils.Flatten3DLocalCoordsToIndex(
+        //                 0, neighborPos.x, neighborPos.y, neighborPos.z, ChunkSize, ChunkSizeY)]
+        //             .Value == VoxelType.Air;
+        //     }
+        //     
+        //     // If not in the local chunk, find the neighbor chunk.
+        //     var neighborChunkCoord = new int2(
+        //         chunkCoord.x + (normal.x * ChunkSize),
+        //         chunkCoord.y + (normal.z * ChunkSize)
+        //     );
+        //     
+        //     // If the neighbor chunk doesn't exist in our map of ready chunks, the face is visible.
+        //     if (!CoordToEntityMap.TryGetValue(neighborChunkCoord, out var neighborChunkEntity)) return true;
+        //     
+        //     // Defensive checks:
+        //     if (neighborChunkEntity == Entity.Null)
+        //         return true;
+        //
+        //     // BufferLookup has HasBuffer (safe in burst) — use it before indexing:
+        //     if (!VoxelDataBufferLookup.HasBuffer(neighborChunkEntity))
+        //         return true;
+        //     
+        //     var neighborVoxelBuffer = VoxelDataBufferLookup[neighborChunkEntity];
+        //     
+        //     var neighborLocalPos = new int3(
+        //         (neighborPos.x % ChunkSize + ChunkSize) % ChunkSize,
+        //          neighborPos.y,
+        //         (neighborPos.z % ChunkSize + ChunkSize) % ChunkSize
+        //     );
+        //     
+        //     return neighborVoxelBuffer[
+        //             ChunkUtils.Flatten3DLocalCoordsToIndex(
+        //                 0, neighborLocalPos.x, neighborLocalPos.y, neighborLocalPos.z, ChunkSize, ChunkSizeY)]
+        //         .Value == VoxelType.Air;
+        // }
     }
 }
