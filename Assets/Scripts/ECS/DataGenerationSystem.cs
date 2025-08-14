@@ -10,20 +10,17 @@ namespace ECS
 {
     [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
-    [UpdateAfter(typeof(ChunkInitializationSystem))]
     public partial struct DataGenerationSystem : ISystem
     {
         private EntityQuery _chunksToGenerateQuery;
-
-        [BurstCompile]
+        
         public void OnCreate(ref SystemState state)
         {
-            state.RequireForUpdate<BeginSimulationEntityCommandBufferSystem.Singleton>();
+            state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
             state.RequireForUpdate<WorldGenerationConfig>();
             
             _chunksToGenerateQuery = SystemAPI.QueryBuilder()
                 .WithAll<NeedsDataGenerationTag, ChunkCoordinate>()
-                // We also need write access to the buffer.
                 .WithAllRW<VoxelDataBuffer>()
                 .Build();
             
@@ -31,13 +28,14 @@ namespace ECS
             
             if (SystemAPI.HasSingleton<WorldGenerationConfig>()) return;
             
-            // Create the configuration singleton if it doesn't exist.
             var configEntity = state.EntityManager.CreateEntity();
+
+            // var fixedCurrentSeed = new FixedString64Bytes("boer12345");
             state.EntityManager.AddComponentData(configEntity, new WorldGenerationConfig
             {
                 Frequency = 0.01f,
                 Amplitude = 32f,
-                Seed = World.WorldSeed.GetStableHash64("boer12345")
+                Seed = uint.MaxValue/*World.WorldSeed.GetStableHash64(ref fixedCurrentSeed)*/
             });
         }
         
@@ -47,21 +45,17 @@ namespace ECS
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            // Get the command buffer for our structural changes.
-            var ecbSingleton = SystemAPI.GetSingleton<BeginSimulationEntityCommandBufferSystem.Singleton>();
+            var ecbSingleton = SystemAPI.GetSingleton<EndSimulationEntityCommandBufferSystem.Singleton>();
             var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
             
-            // Get the world generation parameters from our singleton.
             var config = SystemAPI.GetSingleton<WorldGenerationConfig>();
-
-            // Prepare the data generation job with the config values.
+            
             var dataGenerationJob = new DataGenerationJob
             {
                 Config = config,
                 CommandBuffer = ecb
             };
-
-            // Schedule the job and chain the dependencies.
+            
             state.Dependency = dataGenerationJob.ScheduleParallel(_chunksToGenerateQuery, state.Dependency);
         }
     }
@@ -69,7 +63,6 @@ namespace ECS
     [BurstCompile]
     public partial struct DataGenerationJob : IJobEntity
     {
-        // By passing the whole config struct, we keep the job's fields tidy.
         [ReadOnly] public WorldGenerationConfig Config;
         public EntityCommandBuffer.ParallelWriter CommandBuffer;
         
@@ -111,11 +104,9 @@ namespace ECS
                             _ when y >= height - 6 && y <= height - 4 => VoxelType.Stone,
                             _ => VoxelType.Air
                         };
-                        
-                        voxelBuffer[
-                            ChunkUtils.Flatten3DLocalCoordsToIndex(
-                                0, x, y, z, VoxelConstants.ChunkSize, VoxelConstants.ChunkSizeY)] 
-                            = new VoxelDataBuffer { Value = voxelType };
+
+                        ChunkUtils.FlattenIndex(new int3(x, y, z), VoxelConstants.ChunkSize, out var index);
+                        voxelBuffer[index] = new VoxelDataBuffer { Value = voxelType };
                     }
                 }
             }

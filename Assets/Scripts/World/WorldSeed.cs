@@ -1,11 +1,11 @@
 using System;
-using System.Runtime.CompilerServices;
+using Unity.Burst;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 
 namespace World
 {
+    [BurstCompile]
     public class WorldSeed : MonoBehaviour
     {
         public static WorldSeed Instance { get; private set; }
@@ -27,7 +27,8 @@ namespace World
                 currentSeed = GenerateRandomStringSeed(SeedLength);
             }
             
-            CurrentSeedHashCode = GetStableHash64(currentSeed);
+            var fixedCurrentSeed = new FixedString64Bytes(currentSeed);
+            CurrentSeedHashCode = GetStableHash64(ref fixedCurrentSeed);
         }
 
         private static string GenerateRandomStringSeed(int lenght)
@@ -46,23 +47,24 @@ namespace World
         }
 
         /// <summary>
-        /// Computes a stable 64-bit hash for the provided input string.
+        /// Computes a stable 64-bit hash for the provided unmanaged fixed-width string.
+        /// This function is Burst-compatible.
         /// </summary>
+        /// <typeparam name="T">Any type that implements INativeList<byte> and IUTF8Bytes, such as FixedString32Bytes.</typeparam>
         /// <param name="input">The input string for which the hash is generated.</param>
         /// <returns>A stable 64-bit hash representing the input string.</returns>
-        public static unsafe ulong GetStableHash64(string input)
+        [BurstCompile]
+        public static unsafe ulong GetStableHash64<T>(ref T input) where T : unmanaged, INativeList<byte>, IUTF8Bytes
         {
-            if (string.IsNullOrEmpty(input)) return 0;
-            
-            var bytes = new NativeArray<byte>(System.Text.Encoding.UTF8.GetBytes(input), Allocator.Temp);
+            // A FixedString can't be null, so we only check if it's empty.
+            if (input.Length == 0) return 0;
 
-            var hashComponents = xxHash3.Hash64(bytes.GetUnsafeReadOnlyPtr(), bytes.Length);
-            
-            bytes.Dispose();
-            
-            // Bit shifts it left by 32 bits, placing it in the upper half of the 64-bit space,
-            // and Bitwise OR combines the shifted high bits with the low 32 bits.
-            return (ulong)hashComponents.y << 32 | hashComponents.x;
+            // Directly get the pointer and length from the FixedString's unmanaged buffer.
+            // The 'Length' property is the number of bytes in the UTF-8 sequence.
+            var hashComponents = xxHash3.Hash64(input.GetUnsafePtr(), input.Length);
+    
+            // Combine the two 32-bit hash components into a single 64-bit ulong.
+            return ((ulong)hashComponents.y << 32) | hashComponents.x;
         }
     }
 }
