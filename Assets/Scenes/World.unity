@@ -245,8 +245,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e55d8aec1c953c64ab81e22a63d296e8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentSeed: boereuteamo12345
-  generateRandomSeed: 0
+  seed: 
+  useRandomSeed: 0
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

@@ -1,5 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Chunk;
+using ECS.Components;
+using ECS.World;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -7,7 +9,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using Voxel;
 
-namespace ECS
+namespace ECS.System
 {
     [BurstCompile]
     [UpdateInGroup(typeof(SimulationSystemGroup))]
@@ -21,6 +23,7 @@ namespace ECS
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<EndSimulationEntityCommandBufferSystem.Singleton>();
+            state.RequireForUpdate<WorldConfiguration>();
             
             _meshingQuery = SystemAPI.QueryBuilder()
                 .WithAll<NeedsMeshingTag, ChunkCoordinate, VoxelDataBuffer>()
@@ -58,8 +61,8 @@ namespace ECS
                 CommandBuffer = ecb,
                 VoxelDataBufferLookup = SystemAPI.GetBufferLookup<VoxelDataBuffer>(true),
                 CoordToEntityMap = coordToEntityMap.AsReadOnly(),
-                ChunkSize = VoxelConstants.ChunkSize,
-                ChunkSizeY = VoxelConstants.ChunkSizeY
+                // ChunkSize = Settings.World.Data.ChunkSize,
+                // ChunkSizeY = Settings.World.Data.ChunkSizeY
             };
             
             var meshingJobHandle = meshingJob.ScheduleParallel(_meshingQuery, populateJobHandle);
@@ -87,8 +90,8 @@ namespace ECS
         public EntityCommandBuffer.ParallelWriter CommandBuffer;
         [ReadOnly] public BufferLookup<VoxelDataBuffer> VoxelDataBufferLookup;
         [ReadOnly] public NativeParallelHashMap<int2, Entity>.ReadOnly CoordToEntityMap;
-        [ReadOnly] public int ChunkSize;
-        [ReadOnly] public int ChunkSizeY;
+        // [ReadOnly] public int ChunkSize;
+        // [ReadOnly] public int ChunkSizeY;
         
         public void Execute(
             Entity entity, 
@@ -109,7 +112,7 @@ namespace ECS
                 var voxelType = localVoxelBuffer[i].Value;
                 if (voxelType == (byte)VoxelType.Air) continue;
                 
-                ChunkUtils.UnflattenIndex(i, VoxelConstants.ChunkSize, out var x, out var y, out var z);
+                ChunkUtils.UnflattenIndex(i, Settings.World.Data.ChunkSize, out var x, out var y, out var z);
                 var voxelPosition = new float3(x, y, z);
                 
                 for (byte faceIndex = 0; faceIndex < VoxelUtils.FaceCount; faceIndex++)
@@ -167,30 +170,34 @@ namespace ECS
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsFaceVisible(int voxelIndex, int3 normal, int2 chunkCoord, in DynamicBuffer<VoxelDataBuffer> localVoxelBuffer)
         {
-            ChunkUtils.UnflattenIndex(voxelIndex, VoxelConstants.ChunkSize, out var x, out var y, out var z);
+            ChunkUtils.UnflattenIndex(voxelIndex, Settings.World.Data.ChunkSize, out var x, out var y, out var z);
             
             var neighborPos = new int3(x, y, z) + normal;
             
-            if (neighborPos.y < 0 || neighborPos.y >= ChunkSizeY) return true;
+            if (neighborPos.y < 0 || neighborPos.y >= Settings.World.Data.ChunkSizeY) return true;
             
-            if (neighborPos.x >= 0 && neighborPos.x < ChunkSize && neighborPos.z >= 0 && neighborPos.z < ChunkSize)
+            if (neighborPos.x >= 0 && neighborPos.x < Settings.World.Data.ChunkSize && 
+                neighborPos.z >= 0 && neighborPos.z < Settings.World.Data.ChunkSize)
             {
-                ChunkUtils.FlattenIndex(neighborPos, VoxelConstants.ChunkSize, out var localIndex);
+                ChunkUtils.FlattenIndex(neighborPos, Settings.World.Data.ChunkSize, out var localIndex);
                 return localVoxelBuffer[localIndex].Value == (byte)VoxelType.Air;
             }
             
-            var neighborChunkCoord = chunkCoord + new int2(normal.x * ChunkSize, normal.z * ChunkSize);
+            var neighborChunkCoord = chunkCoord + new int2(
+                normal.x * Settings.World.Data.ChunkSize, 
+                normal.z * Settings.World.Data.ChunkSize
+            );
             
             if (!CoordToEntityMap.TryGetValue(neighborChunkCoord, out var neighborChunkEntity)) return true;
             if (!VoxelDataBufferLookup.HasBuffer(neighborChunkEntity)) return true;
             
             var neighborVoxelBuffer = VoxelDataBufferLookup[neighborChunkEntity];
             var neighborLocalPos = new int3(
-                (neighborPos.x % ChunkSize + ChunkSize) % ChunkSize, 
+                (neighborPos.x % Settings.World.Data.ChunkSize + Settings.World.Data.ChunkSize) % Settings.World.Data.ChunkSize, 
                  neighborPos.y, 
-                (neighborPos.z % ChunkSize + ChunkSize) % ChunkSize);
+                (neighborPos.z % Settings.World.Data.ChunkSize + Settings.World.Data.ChunkSize) % Settings.World.Data.ChunkSize);
             
-            ChunkUtils.FlattenIndex(neighborLocalPos, VoxelConstants.ChunkSize, out var neighborIndex);
+            ChunkUtils.FlattenIndex(neighborLocalPos, Settings.World.Data.ChunkSize, out var neighborIndex);
             return neighborVoxelBuffer[neighborIndex].Value == (byte)VoxelType.Air;
         }
     }

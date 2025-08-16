@@ -3,7 +3,7 @@ using Unity.Mathematics;
 using UnityEngine;
 using Voxel;
 
-namespace ECS
+namespace ECS.Components
 {
     // --- TAG COMPONENTS ---
     
@@ -111,10 +111,13 @@ namespace ECS
     }
 
     /// <summary>
-    /// A configuration component for world generation settings, used to define frequency, amplitude, and seed values for procedural generation.
+    /// A World component for world generation settings,
+    /// used to define frequency, amplitude, seed... for procedural generation.
     /// </summary>
-    public struct WorldGenerationConfig : IComponentData
+    public struct WorldConfiguration : IComponentData
     {
+        public byte ChunkSize;
+        public byte ChunkSizeY;
         public float Frequency;
         public float Amplitude;
         public ulong Seed;
@@ -126,6 +129,14 @@ namespace ECS
     public class VoxelRenderResources : IComponentData
     {
         public Material VoxelMaterial;
+    }
+
+    /// <summary>
+    /// Used as a component to store the player's coordinates for systems, that need to access or update the player's spatial data.
+    /// </summary>
+    public struct PlayerPosition : IComponentData
+    {
+        public float3 Value;
     }
     
 }

@@ -1,8 +1,9 @@
-﻿using Unity.Entities;
+﻿using ECS.Components;
+using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
 
-namespace ECS
+namespace ECS.Authoring
 {
     public class PlayerAuthoring : MonoBehaviour
     {
@@ -12,7 +13,7 @@ namespace ECS
         {
             public override void Bake(PlayerAuthoring authoring)
             {
-                var entity = GetEntity(TransformUsageFlags.Dynamic);
+                var entity = GetEntity(authoring, TransformUsageFlags.Dynamic);
                 
                 AddComponent(entity, new PlayerPosition
                 {

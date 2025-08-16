@@ -1,7 +1,9 @@
-﻿using Unity.Burst;
+﻿using ECS.Components;
+using ECS.World;
+using Unity.Burst;
 using Unity.Entities;
 
-namespace ECS
+namespace ECS.System
 {
     [BurstCompile]
     [UpdateInGroup(typeof(InitializationSystemGroup))]
@@ -14,6 +16,7 @@ namespace ECS
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<EndInitializationEntityCommandBufferSystem.Singleton>();
+            state.RequireForUpdate<WorldConfiguration>();
             
             _newChunksQuery = SystemAPI.QueryBuilder()
                 .WithAll<NewChunkTag, ChunkCoordinate>()
@@ -26,13 +29,13 @@ namespace ECS
         public void OnUpdate(ref SystemState state)
         {
             var ecbSingleton = SystemAPI.GetSingleton<EndInitializationEntityCommandBufferSystem.Singleton>();
-            
             var ecb = ecbSingleton.CreateCommandBuffer(state.WorldUnmanaged).AsParallelWriter();
 
             var addVoxelBufferJob = new AddVoxelBufferJob
             {
                 CommandBuffer = ecb,
-                ChunkVoxelCount = Chunk.ChunkUtils.GetChunkTotalSize(VoxelConstants.ChunkSize, VoxelConstants.ChunkSizeY)
+                ChunkVoxelCount = Chunk.ChunkUtils.GetChunkTotalSize(
+                    Settings.World.Data.ChunkSize, Settings.World.Data.ChunkSizeY)
             };
 
             state.Dependency = addVoxelBufferJob.ScheduleParallel(_newChunksQuery, state.Dependency);

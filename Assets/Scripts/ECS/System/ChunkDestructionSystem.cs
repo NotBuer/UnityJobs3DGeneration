@@ -1,10 +1,12 @@
-﻿using Unity.Burst;
+﻿using ECS.Components;
+using Unity.Burst;
 using Unity.Entities;
 
-namespace ECS
+namespace ECS.System
 {
     [BurstCompile]
     [UpdateInGroup(typeof(InitializationSystemGroup))]
+    [UpdateAfter(typeof(WorldBootstrapSystem))]
     public partial struct ChunkDestructionSystem : ISystem
     {
         private EntityQuery _chunksToDestroyQuery;
@@ -13,6 +15,7 @@ namespace ECS
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<BeginInitializationEntityCommandBufferSystem.Singleton>();
+            state.RequireForUpdate<WorldConfiguration>();
             
             _chunksToDestroyQuery = SystemAPI.QueryBuilder()
                     .WithAll<ToUnloadTag>()
@@ -27,8 +30,6 @@ namespace ECS
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
-            // state.Dependency.Complete();
-            
             var ecb = SystemAPI.GetSingleton<BeginInitializationEntityCommandBufferSystem.Singleton>()
                 .CreateCommandBuffer(state.WorldUnmanaged);
             

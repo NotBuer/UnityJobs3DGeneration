@@ -1,9 +1,11 @@
+using ECS.Components;
+using ECS.World;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 
-namespace ECS
+namespace ECS.System
 {
     [BurstCompile]
     [UpdateInGroup(typeof(InitializationSystemGroup))]
@@ -14,6 +16,7 @@ namespace ECS
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<EndInitializationEntityCommandBufferSystem.Singleton>();
+            state.RequireForUpdate<WorldConfiguration>();
             
             state.RequireForUpdate<ChunkSpawningState>();
             state.RequireForUpdate<PlayerPosition>();
@@ -39,8 +42,8 @@ namespace ECS
             var playerPos = SystemAPI.GetSingleton<PlayerPosition>().Value;
             
             var currentPlayerChunkPos = new int2(
-                (int)math.floor(playerPos.x / VoxelConstants.ChunkSize) * VoxelConstants.ChunkSize,
-                (int)math.floor(playerPos.z / VoxelConstants.ChunkSize) * VoxelConstants.ChunkSize);
+                (int)math.floor(playerPos.x / Settings.World.Data.ChunkSize) * Settings.World.Data.ChunkSize,
+                (int)math.floor(playerPos.z / Settings.World.Data.ChunkSize) * Settings.World.Data.ChunkSize);
 
             if (currentPlayerChunkPos.x == chunkSpawningState.LastPlayerChunkPos.x &&
                 currentPlayerChunkPos.y == chunkSpawningState.LastPlayerChunkPos.y) return;
@@ -62,7 +65,8 @@ namespace ECS
                 activeChunks.TryAdd(coord.ValueRO.Value, entity);
             }
             
-            const int radius = VoxelConstants.RenderDistance;
+            // TODO: Remove hardcoded when have implemented user settings component data.
+            const int radius = 6;
 
             for (var x = -radius; x <= radius; x++)
             {
@@ -71,8 +75,8 @@ namespace ECS
                     if (x * x + z * z > radius * radius) continue;
 
                     var requiredPos = new int2(
-                        currentPlayerChunkPos.x + (x * VoxelConstants.ChunkSize),
-                        currentPlayerChunkPos.y + (z * VoxelConstants.ChunkSize)
+                        currentPlayerChunkPos.x + (x * Settings.World.Data.ChunkSize),
+                        currentPlayerChunkPos.y + (z * Settings.World.Data.ChunkSize)
                     );
 
                     requiredChunks.Add(requiredPos);
@@ -96,17 +100,5 @@ namespace ECS
             requiredChunks.Dispose();
             activeChunks.Dispose();
         }
-    }
-
-    public struct PlayerPosition : IComponentData
-    {
-        public float3 Value;
-    }
-
-    public static class VoxelConstants
-    {
-        public const byte ChunkSize = 16;
-        public const byte ChunkSizeY = 0XFF;
-        public const int RenderDistance = 8;
     }
 }
