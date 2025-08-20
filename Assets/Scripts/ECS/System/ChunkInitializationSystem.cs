@@ -7,7 +7,7 @@ namespace ECS.System
 {
     [BurstCompile]
     [UpdateInGroup(typeof(InitializationSystemGroup))]
-    [UpdateAfter(typeof(ChunkSpawningSystem))] 
+    [UpdateAfter(typeof(ChunkSpawningSystem))]
     public partial struct ChunkInitializationSystem : ISystem
     {
         private EntityQuery _newChunksQuery;
@@ -24,6 +24,8 @@ namespace ECS.System
             
             state.RequireForUpdate(_newChunksQuery);
         }
+        
+        public void OnDestroy(ref SystemState state) { }
         
         [BurstCompile]
         public void OnUpdate(ref SystemState state)

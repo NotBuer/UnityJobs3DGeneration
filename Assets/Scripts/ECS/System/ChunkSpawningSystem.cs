@@ -65,8 +65,7 @@ namespace ECS.System
                 activeChunks.TryAdd(coord.ValueRO.Value, entity);
             }
             
-            // TODO: Remove hardcoded when have implemented user settings component data.
-            const int radius = 6;
+            var radius = Settings.World.Data.RenderDistance;
 
             for (var x = -radius; x <= radius; x++)
             {

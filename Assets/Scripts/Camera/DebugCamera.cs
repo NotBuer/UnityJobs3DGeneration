@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -90,9 +91,8 @@ namespace Camera
         {
             var lookInput = _lookAction.ReadValue<Vector2>();
             
-            mouseX += lookInput.x * (mouseSpeed * Time.deltaTime);
-            mouseY -= lookInput.y * (mouseSpeed * Time.deltaTime);
-            
+            mouseX += lookInput.x * (mouseSpeed * Time.deltaTime); // YAW
+            mouseY -= lookInput.y * (mouseSpeed * Time.deltaTime); // PITCH
             mouseY = Mathf.Clamp(mouseY, -90f, 90f);
             
             //Unity uses ZXY Euler angle order, that's why the reverse order of the rotation.

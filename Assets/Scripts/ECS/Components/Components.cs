@@ -121,6 +121,7 @@ namespace ECS.Components
         public float Frequency;
         public float Amplitude;
         public ulong Seed;
+        public byte RenderDistance; // TODO: Move this to user settings related component...
     }
 
     /// <summary>
@@ -138,5 +139,48 @@ namespace ECS.Components
     {
         public float3 Value;
     }
-    
+
+    /// <summary>
+    /// Component that captures the player's input actions, including movement and jumping capabilities.
+    /// </summary>
+    public struct PlayerInput : IComponentData
+    {
+        public float2 Move;
+        public float2 Look;
+        public bool Jump;
+        public bool Run;
+    }
+
+    /// <summary>
+    /// Represents the player's statistics, such as movement speed.
+    /// This component is used to store gameplay-related attributes specific to a player entity.
+    /// </summary>
+    public struct PlayerStats : IComponentData
+    {
+        public byte MovementSpeed;
+        public byte LookSpeed;
+    }
+
+    /// <summary>
+    /// Represents the camera orientation for a player character, storing yaw and pitch angles.
+    /// </summary>
+    public struct EcsCamera : IComponentData
+    {
+        public float3 Offset;
+        public float Pitch;
+        public float Near;
+        public float Far;
+        public float FoV; // TODO: Move this to user settings related component...
+    }
+
+    public struct EcsCameraFollow : IComponentData
+    {
+        public Entity Target;
+    }
+
+    public struct PlayerSettings : IComponentData
+    {
+        public float LookSensitivityX;
+        public float LookSensitivityY;
+    }
 }

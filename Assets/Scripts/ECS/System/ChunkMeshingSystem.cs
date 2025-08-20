@@ -61,8 +61,6 @@ namespace ECS.System
                 CommandBuffer = ecb,
                 VoxelDataBufferLookup = SystemAPI.GetBufferLookup<VoxelDataBuffer>(true),
                 CoordToEntityMap = coordToEntityMap.AsReadOnly(),
-                // ChunkSize = Settings.World.Data.ChunkSize,
-                // ChunkSizeY = Settings.World.Data.ChunkSizeY
             };
             
             var meshingJobHandle = meshingJob.ScheduleParallel(_meshingQuery, populateJobHandle);
@@ -90,8 +88,6 @@ namespace ECS.System
         public EntityCommandBuffer.ParallelWriter CommandBuffer;
         [ReadOnly] public BufferLookup<VoxelDataBuffer> VoxelDataBufferLookup;
         [ReadOnly] public NativeParallelHashMap<int2, Entity>.ReadOnly CoordToEntityMap;
-        // [ReadOnly] public int ChunkSize;
-        // [ReadOnly] public int ChunkSizeY;
         
         public void Execute(
             Entity entity, 

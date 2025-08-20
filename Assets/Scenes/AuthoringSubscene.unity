@@ -148,10 +148,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d811831f1b6844ea8314262dc403d931, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  startingPosition:
+  position:
     x: 0
-    y: 20
+    y: 64
     z: 0
+  movementSpeed: 20
+  lookSpeed: 10
+  offset:
+    x: 0
+    y: 1.8
+    z: 0
+  near: 0.1
+  far: 1024
+  lookSensitivityX: 0.02
+  lookSensitivityY: 0.02
+  fov: 70
+  renderDistance: 2
 --- !u!4 &516399402
 Transform:
   m_ObjectHideFlags: 0
@@ -242,7 +254,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chunkSize: 16
   chunkSizeY: 255
-  renderDistance: 2
+  renderDistance: 16
   frequency: 0.01
   amplitude: 32
   seed: boerzinho1234
@@ -256,7 +268,7 @@ Transform:
   m_GameObject: {fileID: 1982763544}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -73.86679, y: 0, z: 29.95686}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

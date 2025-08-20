@@ -2,7 +2,6 @@
 using ECS.Components;
 using ECS.World;
 using Unity.Burst;
-using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using UnityEngine;
@@ -40,7 +39,6 @@ namespace ECS.System
             
             var dataGenerationJob = new DataGenerationJob
             {
-                // World = Settings.World.Data,
                 CommandBuffer = ecb
             };
             
@@ -51,7 +49,6 @@ namespace ECS.System
     [BurstCompile]
     public partial struct DataGenerationJob : IJobEntity
     {
-        // [ReadOnly] public WorldConfiguration World;
         public EntityCommandBuffer.ParallelWriter CommandBuffer;
         
         public void Execute(
