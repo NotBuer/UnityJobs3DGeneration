@@ -80,8 +80,8 @@ namespace ECS.System
                         bounds = bounds.Value
                     }
                 };
-
-                // Define the vertex layout.
+                
+                // TODO: Cache this on initialization and dispose it a destroy time, no need to create it on the fly.
                 var vertexAttributes = new NativeArray<VertexAttributeDescriptor>(3, Allocator.Temp, NativeArrayOptions.UninitializedMemory)
                 {
                     [0] = new VertexAttributeDescriptor(VertexAttribute.Position, VertexAttributeFormat.Float32, 3, stream: 0),

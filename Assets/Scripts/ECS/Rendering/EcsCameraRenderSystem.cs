@@ -30,18 +30,20 @@ namespace ECS.Rendering
         private void OnBeginCameraRendering(ScriptableRenderContext context, UnityEngine.Camera camera)
         {
             if (camera.cameraType != CameraType.Game) return;
-
-            foreach (var (ecsCamera, transform) 
-                     in SystemAPI.Query<RefRO<EcsCamera>, RefRO<LocalTransform>>())
+            
+            foreach (var (ecsCamera, transform, parent, _) 
+                     in SystemAPI.Query<RefRO<EcsCamera>, RefRO<LocalTransform>, RefRO<Parent>>().WithEntityAccess())
             {
                 camera.transform.SetPositionAndRotation(transform.ValueRO.Position, transform.ValueRO.Rotation);
+
+                if (EntityManager.HasComponent<PlayerSettings>(parent.ValueRO.Value))
+                    camera.fieldOfView = EntityManager.GetComponentData<PlayerSettings>(parent.ValueRO.Value).FoV;
                 
-                camera.fieldOfView = ecsCamera.ValueRO.FoV;
                 camera.nearClipPlane = ecsCamera.ValueRO.Near;
                 camera.farClipPlane = ecsCamera.ValueRO.Far;
-                
+            
                 break;
-            }
+            }   
         }
     }
 }

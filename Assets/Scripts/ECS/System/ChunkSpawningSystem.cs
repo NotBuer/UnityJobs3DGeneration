@@ -20,6 +20,7 @@ namespace ECS.System
             
             state.RequireForUpdate<ChunkSpawningState>();
             state.RequireForUpdate<PlayerPosition>();
+            state.RequireForUpdate<PlayerSettings>();
             
             if (SystemAPI.HasSingleton<ChunkSpawningState>()) return;
             
@@ -40,6 +41,7 @@ namespace ECS.System
             var chunkSpawningState = SystemAPI.GetComponent<ChunkSpawningState>(chunkSpawningStateEntity);
             
             var playerPos = SystemAPI.GetSingleton<PlayerPosition>().Value;
+            var settings = SystemAPI.GetSingleton<PlayerSettings>();
             
             var currentPlayerChunkPos = new int2(
                 (int)math.floor(playerPos.x / Settings.World.Data.ChunkSize) * Settings.World.Data.ChunkSize,
@@ -65,7 +67,7 @@ namespace ECS.System
                 activeChunks.TryAdd(coord.ValueRO.Value, entity);
             }
             
-            var radius = Settings.World.Data.RenderDistance;
+            var radius = settings.RenderDistance;
 
             for (var x = -radius; x <= radius; x++)
             {

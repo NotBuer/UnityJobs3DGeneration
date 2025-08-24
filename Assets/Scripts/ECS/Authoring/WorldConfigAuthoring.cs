@@ -11,10 +11,6 @@ namespace ECS.Authoring
         [Range(1, 32)] [SerializeField] private byte chunkSize = 16;
         [Range(1, 0XFF)] [SerializeField] private byte chunkSizeY = 255;
         
-        // TODO: Segregate render distance from world config, to user settings component.
-        [Header("Render Distance Settings")]
-        [Range(2, 16)] [SerializeField] private byte renderDistance = 2;
-        
         [Header("World Generation Settings")]
         [SerializeField] private float frequency = 0.01f;
         [SerializeField] private float amplitude = 32f;
@@ -36,7 +32,6 @@ namespace ECS.Authoring
                     Frequency = authoring.frequency,
                     Amplitude = authoring.amplitude,
                     Seed = WorldSeedUtils.GetSeedHash(authoring.useRandomSeed ? string.Empty : authoring.seed),
-                    RenderDistance = authoring.renderDistance
                 });
             }
         }

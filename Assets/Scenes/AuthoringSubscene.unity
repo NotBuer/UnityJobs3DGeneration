@@ -150,9 +150,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   position:
     x: 0
-    y: 64
+    y: 0
     z: 0
-  movementSpeed: 20
+  movementSpeed: 30
   lookSpeed: 10
   offset:
     x: 0
@@ -163,7 +163,7 @@ MonoBehaviour:
   lookSensitivityX: 0.02
   lookSensitivityY: 0.02
   fov: 70
-  renderDistance: 2
+  renderDistance: 16
 --- !u!4 &516399402
 Transform:
   m_ObjectHideFlags: 0
@@ -254,7 +254,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   chunkSize: 16
   chunkSizeY: 255
-  renderDistance: 16
   frequency: 0.01
   amplitude: 32
   seed: boerzinho1234

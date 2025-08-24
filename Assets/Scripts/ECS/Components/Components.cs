@@ -121,7 +121,6 @@ namespace ECS.Components
         public float Frequency;
         public float Amplitude;
         public ulong Seed;
-        public byte RenderDistance; // TODO: Move this to user settings related component...
     }
 
     /// <summary>
@@ -170,7 +169,6 @@ namespace ECS.Components
         public float Pitch;
         public float Near;
         public float Far;
-        public float FoV; // TODO: Move this to user settings related component...
     }
 
     public struct EcsCameraFollow : IComponentData
@@ -182,5 +180,7 @@ namespace ECS.Components
     {
         public float LookSensitivityX;
         public float LookSensitivityY;
+        public byte RenderDistance;
+        public float FoV;
     }
 }

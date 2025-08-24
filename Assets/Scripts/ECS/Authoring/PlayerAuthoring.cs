@@ -50,7 +50,9 @@ namespace ECS.Authoring
                 AddComponent(entity, new PlayerSettings
                 {
                     LookSensitivityX = authoring.lookSensitivityX,
-                    LookSensitivityY = authoring.lookSensitivityY
+                    LookSensitivityY = authoring.lookSensitivityY,
+                    FoV = authoring.fov,
+                    RenderDistance = authoring.renderDistance
                 });
 
                 var cameraEntity = CreateAdditionalEntity(TransformUsageFlags.Dynamic);
@@ -61,7 +63,6 @@ namespace ECS.Authoring
                     Pitch = 0f,
                     Near = authoring.near,
                     Far = authoring.far,
-                    FoV = authoring.fov
                 });
                 AddComponent(cameraEntity, new EcsCameraFollow
                 {
